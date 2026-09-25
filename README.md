@@ -23,7 +23,14 @@ raw OpenShell pod boundary to the production-shaped Secure Agent Workspace VM:
    a client application, and change a rail live.
 
 * `automation/` contains the raw OpenShell harness and pinned policies used by
-  the raw-track modules (1, 2, and the optional Security CTF).
+  the raw-track modules (1, 2, and the optional Security CTF), plus the
+  Argo-managed capstone prerequisites.
+* `automation/sre-capstone/` is the GitOps source for the Module 7 capstone
+  environment (demo shop, MLflow instance, telemetry proxy, incident console,
+  and the incident-data seed job): `Application module-7-prereqs` in the
+  `vp-gitops` namespace points at `automation/sre-capstone/components` here.
+  Bootstrap with `make -C automation capstone-bootstrap` after the SAW
+  deployment is up.
 * `automation/charts/nemo-guardrails` is the Helm chart Module 8 installs: it
   deploys the guardrails server via the TrustyAI operator with a
   user-supplied model API key.
@@ -53,4 +60,6 @@ npm run build
 The workshop includes the harness raw OpenShell deployment and policy
 quickstart. It consumes the SAW deployment procedure directly from the fork's
 Antora component so charts, scripts, and deployment commands are not copied into
-this repository.
+this repository. The SAW fork stays trim to the changes needed for the SAW
+deployment itself; workshop-specific assets (the capstone environment, its
+GitOps Application, and the participant exercises) live here.

@@ -1,0 +1,22 @@
+# Module 7 prerequisite: the RHOAI MLflow instance the traces specialist queries.
+# Sync wave 1 — requires the RHOAI (OpenDataHub) MLflow operator to be installed
+# on the cluster (cluster baseline; the operator reconciles this CR into the
+# TLS-only MLflow server with the kubernetes-auth plugin and workspaces enabled).
+# Sync wave 1 — after the namespace exists, before anything that queries it.
+apiVersion: mlflow.opendatahub.io/v1
+kind: MLflow
+metadata:
+  name: mlflow
+  namespace: redhat-ods-applications
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  artifactsDestination: file:///mlflow/artifacts
+  backendStoreUri: sqlite:////mlflow/mlflow.db
+  serveArtifacts: true
+  storage:
+    accessModes: [ReadWriteOnce]
+    resources:
+      requests:
+        storage: 5Gi

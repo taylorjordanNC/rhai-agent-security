@@ -1,0 +1,39 @@
+# Module 7 capstone prerequisites — Argo CD Application.
+#
+# One-time bootstrap (after the SAW deployment is up — the telemetry proxy and
+# the seed Job land in namespaces the SAW deployment creates):
+#
+#   oc apply -f automation/sre-capstone/bootstrap/module-7-prereqs.yaml
+#
+# The Application watches this repository's automation/sre-capstone/components
+# directory. Sync waves order the components: demo shop (0), MLflow instance
+# (1), telemetry proxy (2, needs openshell-agents from the SAW deployment),
+# incident console (3), seed RBAC (4). A PostSync hook Job plants the
+# incident-story traces after everything is healthy, re-running idempotently
+# on each sync.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: module-7-prereqs
+  namespace: vp-gitops
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/taylorjordanNC/rhai-agent-security.git
+    targetRevision: main
+    path: automation/sre-capstone/components
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 3m

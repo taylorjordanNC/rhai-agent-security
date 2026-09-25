@@ -1,11 +1,65 @@
 = Module 7: SRE Copilot Capstone
 :navtitle: SRE Copilot Capstone
 
-This optional extension uses a separately provisioned agent fleet and
-observability stack. Participants inject a payments outage, inspect specialist
-findings, test one policy boundary, and confirm the fixed remediation action.
+This optional extension runs a three-agent observability fleet against the
+deployed Secure Agent Workspace. Participants verify governance-signed
+per-agent access, investigate live telemetry, drive a real outage in the
+browser, and confirm the remediation as a human.
 
 *Estimated time:* 45 minutes
+
+== Why this matters
+
+Enterprises do not stall on whether AI agents *can* help operate systems —
+they stall on "what can this agent see, what can it do, and who is
+accountable when it is wrong?" In regulated environments, agent access has
+to be a reviewed contract: least-privilege, per-role, auditable, revocable,
+deployed as code. The three-agent fleet is that pattern in miniature.
+
+[cols="1,2,2",options="header"]
+|===
+| Agent | Business job | What breaks without the policy
+
+| `metrics`
+| *On-call copilot / incident triage.* A first responder asks
+plain-language questions and gets quantified answers from live telemetry —
+without dashboard admin or any write path.
+| An agent with blanket cluster read is an unmonitored copy of your most
+sensitive dashboards — one prompt injection away from exfiltration.
+
+| `traces`
+| *Agent forensics + self-diagnostics.* Someone must be able to answer
+"what did the agent *actually* do?" — for debugging, for audit, for the
+transparency regulators increasingly demand.
+| No evidence trail means "the agent did it" is unfalsifiable — you can
+neither debug it nor defend it to an auditor.
+
+| `analyst`
+| *Zero-exfiltration reporting.* An objective synthesizer that is *unable*
+to reach any telemetry by construction. The leak risk is designed out, not
+trusted away.
+| A summarizing agent with full read access is a natural exfiltration
+channel — it touches everything and repeats everything.
+|===
+
+*The one-line takeaway:* specialists with narrow mandates, an analyst with
+none, humans confirming every action — access as a reviewed contract is
+what makes AI agents deployable in an enterprise.
+
+== How governance holds this together
+
+The *governance interceptor* is the platform's policy gatekeeper. It sits
+between the gateway and every sandbox creation: it *signs* each sandbox's
+policy, *vends* the provider profiles agents may use, and *rejects* any
+operation that falls outside the governance baseline — fail-closed.
+
+For this module the interceptor vends per-agent *network ceilings*: each
+fleet agent's policy names the one backend it may reach, the interceptor
+signs that policy, and the sandbox may *narrow* the baseline but never
+widen it. The signed policy is what the sandbox runtime enforces — so the
+"guest list" is not an agent's promise, it is governance-enforced fact.
+Every claim in this module is verified from outside the agent by paired
+probes and audit evidence, never taken from the agent's own output.
 
 == The fleet design
 
@@ -13,167 +67,268 @@ findings, test one policy boundary, and confirm the fixed remediation action.
 |===
 | Agent | Allowed backend | Job
 
-| `logs`
-| Loki application logs
-| Find error lines and affected services.
-
 | `metrics`
-| Thanos / Prometheus
-| Quantify rates, saturation, and failing workloads.
+| Prometheus (Thanos querier) via the telemetry proxy
+| Quantify rates, saturation, and failing workloads from live cluster metrics.
 
 | `traces`
-| Tempo
-| Identify the failing request span.
-
-| `events`
-| Loki infrastructure stream
-| Read Kubernetes events and control-plane evidence.
+| MLflow (RHOAI) via the telemetry proxy
+| Read and reason over AI agent execution traces — agents auditing agents.
 
 | `analyst`
-| No telemetry backend; registry access remains available
-| Combine findings and recommend a root cause and fix.
+| None — zero egress
+| Combine findings and recommend a root cause and fix, without any way to
+verify them itself.
 |===
 
-The metrics and traces agents use different backend hosts. The logs and events
-agents share the Loki gateway host; their application-versus-infrastructure
-paths are selected by their tools and personas, not separated by host policy.
-The analyst has no telemetry-backend rule but retains the in-cluster registry
-rule used by the fleet runtime.
+The backends sit behind a plain-HTTP telemetry proxy (the sandbox egress
+proxy inspects HTTP; TLS-only upstreams route through it). The fleet
+design originates in the `nemoclaw-openshift-launchable` sample (Scout,
+Gauge, Trace, Probe, Sage), scaled to three agents for this environment.
 
 == Extension prerequisites
 
-This module is available only when the facilitator has pre-provisioned the
-launchable, observability backends, fleet sandboxes, instrumented application,
-and separate OpenShell gateway. Obtain these values before starting:
-
-* `CAPSTONE_GATEWAY`: registered OpenShell gateway name;
-* `CAPSTONE_NAMESPACE`: fleet and workshop namespace; and
-* `CAPSTONE_URL`: incident-lab URL.
-
-== Exercise 1: Verify the fleet
+The capstone environment is **Argo-managed from this repository**:
+`automation/sre-capstone/` holds the Application that brings the demo shop,
+the MLflow instance, the telemetry proxy, the incident console, and the
+planted incident data up with the cluster's GitOps. The facilitator
+bootstraps it once, after the SAW deployment (module 6) is up:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-: "${CAPSTONE_GATEWAY:?Facilitator must set CAPSTONE_GATEWAY}"
-: "${CAPSTONE_NAMESPACE:?Facilitator must set CAPSTONE_NAMESPACE}"
-: "${CAPSTONE_URL:?Facilitator must set CAPSTONE_URL}"
-openshell gateway select "$CAPSTONE_GATEWAY"
-oc get pods -n "$CAPSTONE_NAMESPACE"
-openshell sandbox list
+make -C automation capstone-bootstrap
+oc get application module-7-prereqs -n vp-gitops   # Synced, then Healthy
 ----
 
-Inspect one agent's effective policy and audit trail:
+The PostSync seed job plants the agent-session traces of a *prior* incident
+(`INC-4127`) into MLflow — the data the traces agent investigates below —
+and re-plants idempotently on each sync. What stays with the facilitator:
+
+* the fleet sandbox names (`metrics`, `traces`, `analyst`) on
+  `{saw_gateway_name}` (provisioned by the `saw-bom` chart via
+  `apply_bom.py` on the workspace VM), and
+* the sandbox hand-off files the module's exec commands read:
+  xref:attachment$plant-incident-traces.sh[plant-incident-traces.sh] run on
+  the workspace VM stages `/tmp/incident-search.json`,
+  `/tmp/mlflow.token` and `/tmp/agent-session-trace.json` inside the
+  `traces` sandbox (idempotent — it also refreshes the planted story).
+
+Resolve the MLflow experiment id once and keep it in your VM shell — every
+MLflow request needs it:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-openshell policy get metrics --full -o json
-openshell logs metrics --source sandbox
+export MLFLOW_EXPERIMENT_ID=$(openshell --gateway {saw_gateway_name} sandbox exec -n traces -- \
+  sh -c 'curl -s --max-time 15 \
+    -H "Authorization: Bearer $(cat /tmp/mlflow.token)" \
+    -H "X-MLFLOW-WORKSPACE: openshell" \
+    "http://telemetry-proxy.openshell-agents.svc.cluster.local:8081/mlflow/api/2.0/mlflow/experiments/get-by-name?experiment_name=sre-copilot-fleet"' \
+  | jq -r .experiment.experiment_id)
+echo "experiment id: $MLFLOW_EXPERIMENT_ID"
 ----
 
-Pass condition: all five fleet sandboxes are ready, and the metrics policy
-contains the Thanos endpoint but not the Loki or Tempo endpoints.
+== Exercise 1: Verify the fleet and its guest lists
 
-== Exercise 2: Test cross-backend denial
+All three sandboxes are Ready, and each one carries a *different*
+governance-signed policy:
 
-Attempt to reach the Loki gateway from two sandboxes: the `logs` sandbox
-declares that host in its policy and the `metrics` sandbox does not. The paired
-requests isolate a policy denial from an unrelated endpoint failure. The Loki
-gateway serves plain HTTP on this port:
-
-[source,bash,role="execute"]
+[source,bash,role="execute",subs="attributes+"]
 ----
-LOKI_URL="http://logging-loki-gateway-http.openshift-logging.svc.cluster.local:8080"
+openshell --gateway {saw_gateway_name} sandbox list
+openshell --gateway {saw_gateway_name} policy get metrics --full
+openshell --gateway {saw_gateway_name} policy get analyst --full
+openshell --gateway {saw_gateway_name} policy get traces --full
+----
 
-if openshell sandbox exec -n logs -- \
-  curl -s -o /dev/null -w 'HTTP %\{http_code\}\n' --connect-timeout 5 --max-time 10 \
-  "$LOKI_URL/"; then
-  echo 'EXPECTED: the logs sandbox reached its declared Loki backend'
+Pass condition: the `metrics` policy names only the Prometheus proxy
+endpoint, the `traces` policy names only the MLflow proxy endpoint, and
+the `analyst` policy names no telemetry endpoint at all. Each policy
+carries the governance signature — this is a signed contract, not an
+agent's word.
+
+== Exercise 2: Prove the walls with paired probes
+
+Attempt the same request from differently-scoped sandboxes. The paired
+requests isolate a policy denial from an unrelated endpoint failure:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+if openshell --gateway {saw_gateway_name} sandbox exec -n metrics -- \
+  curl -s -o /dev/null -w 'HTTP \{http_code}\n' --max-time 15 \
+  "http://telemetry-proxy.openshell-agents.svc.cluster.local:8080/api/v1/query?query=up"; then
+  echo 'EXPECTED: the metrics sandbox reached its declared backend'
 else
-  echo 'ERROR: the declared backend was unreachable from the logs sandbox'
+  echo 'ERROR: the declared backend was unreachable'
   false
 fi
 
-if openshell sandbox exec -n metrics -- \
-  curl -s -o /dev/null -w 'HTTP %\{http_code\}\n' --connect-timeout 5 --max-time 10 \
-  "$LOKI_URL/"; then
-  echo 'ERROR: metrics reached an undeclared telemetry backend'
+if openshell --gateway {saw_gateway_name} sandbox exec -n metrics -- \
+  curl -s -o /dev/null -w 'HTTP \{http_code}\n' --max-time 15 \
+  "http://telemetry-proxy.openshell-agents.svc.cluster.local:8081/"; then
+  echo 'ERROR: metrics reached an undeclared backend'
   false
 else
-  echo 'Request failed; verify the Loki-host denial event'
+  echo 'Request denied before HTTP; check the denial in the audit stream'
 fi
-openshell logs metrics --since 30s
 ----
 
-The `logs` request completes with an HTTP status even when the gateway answers
-401 without a bearer token; any HTTP response proves the policy allowed the
-connection. The `metrics` request fails before HTTP because the host is absent
-from that sandbox's policy; the gateway denial event is the required evidence.
+Repeat the pair from the `analyst` sandbox (both requests denied) and from
+`traces` (MLflow allowed, Prometheus denied). Any HTTP status — including
+401 without a bearer token — proves the policy allowed the connection;
+a denial fails before HTTP because the host is absent from that sandbox's
+policy.
 
-== Exercise 3: Investigate the payments outage
+== Exercise 3: Read live telemetry through the scoped agent
 
-Open `$CAPSTONE_URL` and complete the incident-lab workflow:
+The `metrics` agent's backend answers 401 without a bearer token — the
+authentication requirement is itself evidence that the path works. With
+the facilitator-vended read-only service account token, the agent queries
+real cluster metrics. Ask the agent (through the Control UI or the TUI) to
+check the health of the `demo` namespace, or query directly:
 
-. Deploy or reset the instrumented shop application and load generator.
-. Record the healthy payment replica count and baseline error rate.
-. Inject the payments outage and verify that the deployment scales to zero.
-. Run the fleet investigation.
-. Compare findings from at least two specialists with the analyst conclusion.
-. Inspect the proposed action before confirming it.
-. Confirm the remediation and verify that the payments deployment returns to
-  one ready replica and the error rate recovers.
+[source,bash,role="execute",subs="attributes+"]
+----
+openshell --gateway {saw_gateway_name} sandbox exec -n metrics -- \
+  sh -c 'curl -s --max-time 15 -H "Authorization: Bearer $SA_TOKEN" \
+    "http://telemetry-proxy.openshell-agents.svc.cluster.local:8080/api/v1/query?query=kube_deployment_status_replicas_available%7Bnamespace%3D%22demo%22%7D"'
+----
 
-The fault scales the payments
-deployment to zero, the shop application produces real failures, and the
-specialists read metrics, logs, traces, and events from their individually
-allowed backends.
+The `traces` agent reads AI agent execution traces from MLflow. The
+facilitator planted the agent-session traces of the prior incident — the
+record of what the fleet *actually did* the last time this incident ran.
+Start by asking the agent in plain language; searching by incident, not by
+trace ID, is the natural read pattern:
 
-The agents recommend; they do not receive Kubernetes write access. The incident
-application performs the fixed scale action after a browser confirmation. That
-confirmation is not durable, identity-bound approval evidence. A production
-workflow would need an authenticated approval record and a controlled delivery
-path such as a reviewed Git change reconciled by Argo CD.
+    "traces, show me what the fleet did during incident INC-4127"
 
-== Evidence to collect
+Run the identical search directly to see exactly what the agent sees:
 
-Capture:
+[source,bash,role="execute",subs="attributes+"]
+----
+openshell --gateway {saw_gateway_name} sandbox exec -n traces -- \
+  sh -c 'curl -s --max-time 15 -X POST \
+    -H "Authorization: Bearer $(cat /tmp/mlflow.token)" \
+    -H "X-MLFLOW-WORKSPACE: openshell" \
+    -H "Content-Type: application/json" \
+    --data-binary @/tmp/incident-search.json \
+    "http://telemetry-proxy.openshell-agents.svc.cluster.local:8081/mlflow/api/3.0/mlflow/traces/search"'
+----
 
-* The fleet status showing each sandbox is ready.
-* The effective policy for two agents with different egress.
-* An allow or deny decision in each relevant audit stream.
-* The telemetry findings from at least two specialists.
-* The analyst recommendation and the browser confirmation result.
+Pass condition: the search returns the planted incident session, ordered
+by time — alert triage, the replica-collapse queries, the traces agent's
+own audit of the fleet, the analyst synthesis, the human approval, and the
+recovery check — each trace tagged with the role that ran it
+(`agent.role`: `metrics`, `traces`, `analyst`, `ops`). Narrow the search
+the same way for any question (for example
+`tags."agent.role" = "metrics"`), then drill into one finding by ID.
+OTLP-ingested traces carry a `tr-` prefix on their trace ID:
 
-This evidence distinguishes policy-enforced backend access from persona-driven
-behavior and records the state transition produced by the incident workflow.
+[source,bash,role="execute",subs="attributes+"]
+----
+# TRACE_ID: copy one from the search result above
+TRACE_ID=tr-26e481fb6b1c17d11918ba6b3d1445ad
+openshell --gateway {saw_gateway_name} sandbox exec -n traces -- \
+  sh -c 'curl -s --max-time 15 \
+    -H "Authorization: Bearer $(cat /tmp/mlflow.token)" \
+    -H "X-MLFLOW-WORKSPACE: openshell" \
+    "http://telemetry-proxy.openshell-agents.svc.cluster.local:8081/mlflow/api/3.0/mlflow/traces/'"$TRACE_ID"'?experiment_id='"$MLFLOW_EXPERIMENT_ID"'"'
+----
+
+This is *agents auditing agents*: the trace store is a record of agent
+behavior — which tools ran, what was sent, who approved what — that a
+governed agent can be interrogated against. The workspace header is
+mandatory on every MLflow request: without it the proxy rejects the call
+outright.
+
+Finally, watch a trace arrive live. The staged sample is a complete agent
+session; ingest it through the OpenTelemetry endpoint — the write path the
+fleet uses — and note that the acknowledgement is empty: OTLP carries no
+response body, which is exactly why search, not IDs, is how you find what
+you just wrote. Then re-run the incident search above and see your own
+session appear in the results:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+# Ingest your own session trace (the write path the fleet uses live):
+openshell --gateway {saw_gateway_name} sandbox exec -n traces -- \
+  sh -c 'curl -s --max-time 15 -X POST \
+    -H "x-mlflow-experiment-id: '"$MLFLOW_EXPERIMENT_ID"'" \
+    -H "X-MLFLOW-WORKSPACE: openshell" \
+    -H "Authorization: Bearer $(cat /tmp/mlflow.token)" \
+    -H "Content-Type: application/json" \
+    --data-binary @/tmp/agent-session-trace.json \
+    "http://telemetry-proxy.openshell-agents.svc.cluster.local:8081/v1/traces"'
+
+# Re-run the incident search — your session (session.demo: participant)
+# now appears in the results alongside the planted fleet traces.
+openshell --gateway {saw_gateway_name} sandbox exec -n traces -- \
+  sh -c 'curl -s --max-time 15 -X POST \
+    -H "Authorization: Bearer $(cat /tmp/mlflow.token)" \
+    -H "X-MLFLOW-WORKSPACE: openshell" \
+    -H "Content-Type: application/json" \
+    --data-binary @/tmp/incident-search.json \
+    "http://telemetry-proxy.openshell-agents.svc.cluster.local:8081/mlflow/api/3.0/mlflow/traces/search"'
+----
+
+== Exercise 4: The incident loop
+
+Open the incident console and drive a real outage, with the fleet
+investigating:
+
+. Record the healthy baseline: the `demo/shop` deployment reports two
+  ready replicas.
+. *Inject the outage* — scale the shop to zero from the console. Human
+  action, not the agent's.
+. Run the fleet investigation: the `metrics` agent queries live cluster
+  metrics and finds the available-replica collapse; the `traces` agent
+  audits what the fleet did last time by searching the planted `INC-4127`
+  session; the `analyst` combines the findings. Note what the analyst
+  *cannot* do — it has no way to verify anything itself, by design.
+. *Confirm the remediation* — restore the shop from the console after
+  reviewing the recommendation.
+. Verify recovery: the shop returns to two ready replicas.
+
+The agents recommend; they never receive Kubernetes write access. The
+console's confirmation button is *not* durable, identity-bound approval
+evidence — a production workflow needs an authenticated approval record
+and a controlled delivery path such as a reviewed Git change reconciled by
+Argo CD.
 
 == Evidence checkpoint
 
-For each artifact, identify the enforcement or ownership layer:
+Collect:
 
-* Per-agent network destination.
-* Per-binary access to a destination.
-* Per-user identity and workspace ownership.
-* Provider key storage and rotation.
-* Browser confirmation before the workshop remediation.
+* the three governance-signed policies with three different guest lists;
+* paired allow/deny decisions for every agent;
+* the live metrics query returning real cluster data through the scoped
+  agent;
+* the incident-tag search returning the planted agent-session story from
+  the `traces` agent, plus the participant's own ingested session trace;
+* the outage state transition: healthy baseline, collapsed replicas,
+  human-confirmed remediation, and recovery.
 
 .Answer key
 [%collapsible]
 ====
-* Per-agent network destination: the per-sandbox OpenShell policy file, visible
-  with `policy get --full`.
-* Per-binary access: the `binaries` binding inside each policy endpoint.
-* Per-user identity and workspace ownership: the Keycloak OIDC identity and the
-  SAW workspace scope.
-* Provider key storage and rotation: Vault and External Secrets Operator,
-  gateway-side only; the sandbox never sees the key.
-* Browser confirmation: the incident UI, which is not durable,
-  identity-bound approval evidence; a production workflow needs an
-  authenticated approval record.
+* Per-agent network destination: the per-sandbox governance-signed policy,
+  visible with `policy get --full`. The interceptor signed each one.
+* The paired probes prove the walls from outside the agent: allowed
+  requests complete with an HTTP status (401 included), denied requests
+  fail before HTTP.
+* The analyst's zero egress means its conclusions cannot be self-verified
+  — synthesis without exfiltration risk, by construction.
+* Trace read patterns: search by incident and role tags is the natural
+  read (the planted `INC-4127` session, ordered by time); the trace ID is
+  only for drilling into one finding. OTLP-ingested traces carry a `tr-`
+  prefix and the ingest acknowledgement is empty — search is how you find
+  what you just wrote.
+* The remediation confirmation is human action through the console; it is
+  not identity-bound approval evidence. Production workflows record an
+  authenticated approval and deliver the change through review.
 ====
 
-When the extension is complete, use the incident UI to remove the instrumented
-application. The facilitator must remove the fleet with its owning automation
-and verify that the separate gateway and observability stack are not shared
-before uninstalling them.
+When the extension is complete, use the console to restore the shop and
+the incident UI to remove the demo application. The facilitator removes
+the fleet sandboxes with their owning automation.
 
 Proceed to xref:11-cleanup.adoc[Cleanup].

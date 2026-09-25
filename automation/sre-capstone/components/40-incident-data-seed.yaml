@@ -1,0 +1,276 @@
+# Module 7 prerequisite: plants the incident-story traces the traces agent
+# (hermes) searches during the module. The ServiceAccount is authorized for
+# MLflow's kubernetes-auth SelfSubjectAccessReview (experiments verbs in the
+# openshell workspace namespace); the Job runs as an Argo CD PostSync hook so
+# it only plants after every component is healthy, and re-plants idempotently
+# on each sync (before-hook-creation) — keeping the story timestamps fresh.
+# Sandbox file-staging (the module's /tmp/*.json hand-off files) stays with
+# the facilitator: plant-incident-traces.sh in the module assets.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mlflow-incident-seed
+  namespace: openshell
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/sync-wave: "4"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mlflow-incident-seed
+  namespace: openshell
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/sync-wave: "4"
+rules:
+  - apiGroups: [""]
+    resources: ["experiments"]
+    verbs: ["get", "list", "create", "update", "delete", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mlflow-incident-seed
+  namespace: openshell
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/sync-wave: "4"
+subjects:
+  - kind: ServiceAccount
+    name: mlflow-incident-seed
+    namespace: openshell
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: mlflow-incident-seed
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: incident-data-seed-code
+  namespace: openshell
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/sync-wave: "4"
+data:
+  seed.py: |
+    #!/usr/bin/env python3
+    """Plants the Module 7 incident-story traces into MLflow.
+
+    Runs as an Argo CD PostSync hook: creates the experiment if missing, removes
+    any previous planting of this incident (idempotent re-runs keep the story
+    timestamps fresh), ingests the agent-session traces of a prior incident
+    response via the OpenTelemetry endpoint through the telemetry proxy, and
+    verifies the traces agent can search them back out by incident tag.
+    """
+    import json
+    import os
+    import secrets
+    import sys
+    import time
+    import urllib.error
+    import urllib.request
+
+    PROXY = os.environ.get("TELEMETRY_PROXY_URL",
+                           "http://telemetry-proxy.openshell-agents.svc.cluster.local:8081")
+    WORKSPACE = os.environ.get("MLFLOW_WORKSPACE", "openshell")
+    EXPERIMENT_NAME = os.environ.get("EXPERIMENT_NAME", "sre-copilot-fleet")
+    INCIDENT_ID = os.environ.get("INCIDENT_ID", "INC-4127")
+    INCIDENT_AGE_MIN = int(os.environ.get("INCIDENT_AGE_MIN", "180"))
+
+    TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+
+
+    def api(method, path, body=None, expect_error_ok=False):
+        token = open(TOKEN_PATH).read().strip()
+        req = urllib.request.Request(PROXY + path, method=method)
+        req.add_header("Authorization", "Bearer " + token)
+        req.add_header("X-MLFLOW-WORKSPACE", WORKSPACE)
+        req.add_header("Content-Type", "application/json")
+        data = json.dumps(body).encode() if body is not None else None
+        try:
+            with urllib.request.urlopen(req, data=data, timeout=30) as r:
+                return json.loads(r.read().decode() or "{}"), r.status
+        except urllib.error.HTTPError as err:
+            payload = err.read().decode()[:300]
+            if expect_error_ok:
+                return {"error": payload}, err.code
+            raise SystemExit(f"ERROR {err.code} {path}: {payload}")
+        except Exception as err:  # noqa: BLE001
+            raise SystemExit(f"ERROR {path}: {err}")
+
+
+    def resolve_experiment():
+        exp, _ = api("GET",
+                     "/mlflow/api/2.0/mlflow/experiments/get-by-name?experiment_name="
+                     + EXPERIMENT_NAME, expect_error_ok=True)
+        exp_id = (exp.get("experiment") or {}).get("experiment_id")
+        if exp_id:
+            print(f"experiment {EXPERIMENT_NAME} found: id {exp_id}")
+            return exp_id
+        print(f"experiment {EXPERIMENT_NAME} not found — creating")
+        created, status = api("POST", "/mlflow/api/2.0/mlflow/experiments/create",
+                              {"name": EXPERIMENT_NAME})
+        exp_id = str(created.get("experiment_id"))
+        if not exp_id:
+            raise SystemExit(f"ERROR creating experiment ({status}): {created}")
+        print(f"experiment created: id {exp_id}")
+        return exp_id
+
+
+    def otlp_span(trace_id, span_id, name, start_ns, end_ns, attributes, parent=None):
+        span = {
+            "traceId": trace_id, "spanId": span_id, "name": name,
+            "kind": 1, "startTimeUnixNano": str(start_ns), "endTimeUnixNano": str(end_ns),
+            "attributes": [{"key": k, "value": {"stringValue": v}}
+                           for k, v in attributes.items()],
+            "status": {"code": 1},
+        }
+        if parent:
+            span["parentSpanId"] = parent
+        return span
+
+
+    # (root span, service, role, incident state, start_min, end_min, [(tool, detail, t0, t1)])
+    STORY = [
+        ("incident-alert-triage", "sre-fleet-metrics", "metrics", "detected",
+         [("tool:prom.query", "up{namespace=\"demo\"}", 179, 178),
+          ("tool:prom.query", "alertmanager_alerts{alertname=\"ShopUnavailable\"}", 178, 177)],
+         180, 176),
+        ("quantify-replica-collapse", "sre-fleet-metrics", "metrics", "investigating",
+         [("tool:prom.query", "kube_deployment_status_replicas_available{deployment=\"shop\"}", 177, 176),
+          ("tool:prom.query", "kube_deployment_spec_replicas{deployment=\"shop\"}", 176, 175)],
+         177, 173),
+        ("audit-fleet-actions", "sre-fleet-traces", "traces", "investigating",
+         [("tool:mlflow.search-traces", "service.name = sre-fleet-metrics", 175, 174),
+          ("tool:mlflow.get-trace", "drill into the replica-collapse query", 174, 173)],
+         175, 171),
+        ("synthesize-findings", "sre-fleet-analyst", "analyst", "investigating",
+         [("tool:report.write", "combine metrics + trace findings", 173, 171)],
+         173, 170),
+        ("root-cause-analysis", "sre-fleet-metrics", "metrics", "investigating",
+         [("tool:prom.query", "kube_pod_container_status_waiting_reason", 170, 169),
+          ("tool:prom.query", "kube_deployment_status_conditions", 169, 168),
+          ("tool:prom.query", "kube_replicaset_status", 168, 167)],
+         170, 166),
+        ("recommend-remediation", "sre-fleet-analyst", "analyst", "remediation-proposed",
+         [("tool:report.write", "recommendation: scale shop back to 2 replicas", 166, 164)],
+         166, 163),
+        ("human-approval", "sre-fleet-ops", "ops", "remediation-approved",
+         [("decision:approve", "operator confirmed scale-up via incident console", 162, 161)],
+         162, 159),
+        ("verify-recovery", "sre-fleet-metrics", "metrics", "resolved",
+         [("tool:prom.query", "kube_deployment_status_replicas_available{deployment=\"shop\"}", 159, 158)],
+         159, 155),
+    ]
+
+
+    def plant(exp_id):
+        now_ns = time.time_ns()
+        ago = lambda minutes: now_ns - minutes * 60 * 1_000_000_000
+        ingested, failed = 0, 0
+        for root, service, role, state, tools, start_min, end_min in STORY:
+            trace_id = secrets.token_hex(16)
+            root_span_id = secrets.token_hex(8)
+            root_attrs = {
+                "service.name": service,
+                "mlflow.traceTag.service.name": service,
+                "mlflow.traceTag.agent.role": role,
+                "mlflow.traceTag.incident.id": INCIDENT_ID,
+                "mlflow.traceTag.incident.severity": "sev2",
+                "mlflow.traceTag.incident.state": state,
+            }
+            spans = [otlp_span(trace_id, root_span_id, root, ago(start_min), ago(end_min),
+                               root_attrs)]
+            for tool_name, detail, t0, t1 in tools:
+                spans.append(otlp_span(trace_id, secrets.token_hex(8), tool_name,
+                                       ago(t0), ago(t1),
+                                       {"tool.detail": detail,
+                                        "mlflow.traceTag.incident.id": INCIDENT_ID},
+                                       parent=root_span_id))
+            payload = {"resourceSpans": [{
+                "resource": {"attributes": [{"key": "service.name",
+                                             "value": {"stringValue": service}}]},
+                "scopeSpans": [{"scope": {"name": "sre-copilot-fleet"}, "spans": spans}],
+            }]}
+            _, status = api("POST", "/v1/traces", payload, expect_error_ok=True)
+            if status == 200:
+                ingested += 1
+            else:
+                failed += 1
+                print(f"WARN: {root} ingest -> HTTP {status}")
+        print(f"ingested {ingested} traces, {failed} failures")
+        if failed:
+            raise SystemExit(f"{failed} trace(s) failed to ingest")
+
+
+    def remove_previous(exp_id):
+        search, _ = api("POST", "/mlflow/api/3.0/mlflow/traces/search",
+                        {"locations": [{"mlflow_experiment": {"experiment_id": exp_id}}],
+                         "max_results": 200,
+                         "filter": "tags.\"incident.id\" = '" + INCIDENT_ID + "'"})
+        ids = [t.get("trace_id") for t in search.get("traces", [])]
+        if not ids:
+            print("no previous planting found")
+            return
+        api("POST", "/mlflow/api/2.0/mlflow/traces/delete-traces",
+            {"experiment_id": exp_id, "request_ids": ids})
+        print(f"removed {len(ids)} previously planted trace(s)")
+
+
+    def verify(exp_id):
+        search, _ = api("POST", "/mlflow/api/3.0/mlflow/traces/search",
+                        {"locations": [{"mlflow_experiment": {"experiment_id": exp_id}}],
+                         "max_results": 20, "order_by": ["timestamp DESC"],
+                         "filter": "tags.\"incident.id\" = '" + INCIDENT_ID + "'"})
+        traces = search.get("traces", [])
+        print(f"verification search: {len(traces)} trace(s) for incident {INCIDENT_ID}")
+        for t in traces:
+            tags = t.get("tags", {})
+            print(f"  {tags.get('service.name', '?')}  {tags.get('agent.role', '?')}  "
+                  f"{tags.get('incident.state', '?')}  {t.get('trace_id')}")
+        if len(traces) < len(STORY):
+            raise SystemExit(f"verification failed: expected >= {len(STORY)}, found {len(traces)}")
+
+
+    exp_id = resolve_experiment()
+    remove_previous(exp_id)
+    plant(exp_id)
+    verify(exp_id)
+    print("incident story planted and verified")
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: incident-data-seed
+  namespace: openshell
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels: { app: incident-data-seed }
+    spec:
+      serviceAccountName: mlflow-incident-seed
+      restartPolicy: Never
+      containers:
+        - name: seed
+          image: python:3.12-slim
+          command: ["python3", "/seed/seed.py"]
+          env:
+            - { name: MLFLOW_WORKSPACE, value: openshell }
+            - { name: EXPERIMENT_NAME, value: sre-copilot-fleet }
+            - { name: INCIDENT_ID, value: INC-4127 }
+          resources:
+            requests: { cpu: 25m, memory: 48Mi }
+            limits: { memory: 128Mi }
+          volumeMounts:
+            - { mountPath: /seed, name: code }
+      volumes:
+        - name: code
+          configMap: { name: incident-data-seed-code }
