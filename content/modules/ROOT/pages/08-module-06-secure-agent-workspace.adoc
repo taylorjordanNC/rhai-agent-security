@@ -68,7 +68,7 @@ runtime boundary, and OpenShell governs what the agent can do within it.
 
 | Compute boundary | OpenShell-managed sandbox pod for evaluation | One dedicated KubeVirt VM for the configured owner, with OpenShell and the agent inside it
 
-| Identity | Plaintext, unauthenticated local port-forward | Keycloak OIDC for CLI and gateway access
+| Identity | No TLS, no auth; local port-forward only | Keycloak OIDC for CLI and gateway access
 
 | Secrets | No model credential required | Vault values synchronized by External Secrets Operator
 

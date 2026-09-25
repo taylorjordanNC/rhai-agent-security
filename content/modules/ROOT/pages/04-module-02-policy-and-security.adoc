@@ -1,11 +1,15 @@
 = Module 2: Policy and Security
 :navtitle: Policy and Security
 
-This is the core OpenShell exercise. You will observe default-deny egress,
-apply the repository's read-only GitHub policy, prove that reads succeed while
-writes remain blocked by L7 enforcement, and inspect the audit evidence. The
-important lesson is not just that OpenShell denies; it is that the policy
-decision is visible, specific, and testable without restarting the sandbox.
+This is the core OpenShell exercise. An agent with a shell and network access
+needs controls that live outside the model — and a customer must be able to
+*prove* what the agent could and could not reach, not just assert it. You will
+observe default-deny egress, apply the repository's read-only GitHub policy,
+prove that reads succeed while writes remain blocked by L7 enforcement, and
+inspect the audit evidence. The important lesson is not just that OpenShell
+denies; it is that the policy decision is visible, specific, and testable
+without restarting the sandbox. That is the evidence a compliance review or
+customer security conversation actually asks for.
 
 *Estimated time:* 35 minutes
 
@@ -17,6 +21,13 @@ event. Network policy changes are applied without recreating the sandbox;
 filesystem policy is verified in a separate sandbox because Landlock is applied
 at sandbox startup.
 
+Landlock is the mechanism behind the filesystem boundary: a Linux kernel
+security feature in which a process declares the filesystem paths it may
+access, and the kernel enforces that declaration. A process can narrow its own
+access but never broaden it, so OpenShell uses it to enforce the filesystem
+rules of the sandbox policy at the kernel boundary — unlike the network
+boundary, there is no enforcement proxy between the process and the filesystem.
+
 == Learning objectives
 
 * Identify the default filesystem and network boundary.
@@ -27,8 +38,9 @@ at sandbox startup.
 
 == Establish the test context
 
-Run this module from the `rhai-agent-security` repository root. Select the raw
-gateway explicitly so the commands cannot operate on the SAW gateway:
+Run this module in the Terminal tab from the `rhai-agent-security` repository
+root. Select the local gateway explicitly so the commands cannot operate on the
+SAW gateway:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -39,16 +51,100 @@ openshell --gateway {raw_gateway_name} status
 openshell --gateway {raw_gateway_name} sandbox get {raw_sandbox_name} >/dev/null
 ----
 
+Expected result: the status reports the selected local gateway and the sandbox
+lookup succeeds, confirming the Module 1 environment is intact.
+
+What each command establishes:
+
+* the two `test -f` commands verify the policy files exist in the checkout
+  before any policy is applied;
+* `gateway select` targets the local gateway, and every command below passes
+  `--gateway` explicitly, so nothing in this module can accidentally operate on
+  a SAW gateway;
+* `sandbox get ... >/dev/null` confirms the Module 1 sandbox still exists —
+  its output is discarded because only the success exit code matters.
+
+== Open the operator view alongside your commands
+
+Open a second terminal, keep this module running in the first, and start the
+OpenShell TUI:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+openshell term --gateway {raw_gateway_name}
+----
+
+Leave it running through the whole module. The two terminals show the same
+environment from two surfaces: Terminal 1 runs user-level commands (sandbox
+exec, policy changes); Terminal 2 is the operator view — every event the
+gateway records (sandbox creation, command execution, network ALLOWED/DENIED
+decisions) streams there in real time. `openshell term` requires a TTY, which
+is why it runs in the interactive terminal.
+
+TUI quick reference:
+
+* the splash screen dismisses on any key; the dashboard cycles the gateway,
+  provider, and sandbox panels with Tab and moves within a panel with the arrow
+  keys or `j`/`k`;
+* select `{raw_sandbox_name}` and press `l` to open its live log stream — the
+  events produced by the exercises in Terminal 1 appear here in real time;
+* Esc steps back one view; Ctrl+C exits the TUI when the module is complete;
+* leave `d` (starts a sandbox deletion flow) and `q` (quits from the dashboard
+  and log views) alone until cleanup.
+
 == Exercise 1: Observe default deny
 
 The new sandbox starts with default-deny network policy. Its filesystem policy
 still permits the normal work paths such as `/sandbox` and `/tmp`; this module
 focuses on the network boundary.
 
+Inspect the effective policy first:
+
 [source,bash,role="execute",subs="attributes+"]
 ----
 openshell --gateway {raw_gateway_name} policy get {raw_sandbox_name} --full
+----
 
+Expected result: no network allow rules — the policy declares default-deny
+egress while permitting the normal work paths. This is the desired state you
+are about to test against reality.
+
+Now attempt an undeclared destination from inside the sandbox:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_name} -- \
+  curl -fsS --connect-timeout 10 --max-time 30 https://api.github.com/zen
+----
+
+Expected result: the request fails before any HTTP response. `sandbox exec`
+exits non-zero, and `curl` reports a connection failure — the network boundary
+denied the destination.
+
+Verify the denial produced audit evidence. The sandbox flushes runtime events
+to the gateway asynchronously, so the evidence query follows a short wait:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+sleep 6
+openshell --gateway {raw_gateway_name} logs {raw_sandbox_name} --since 30s
+----
+
+Expected result: an OCSF event naming `api.github.com`, the calling binary
+(`/usr/bin/curl`), and the denial reason. Those three fields are the audit
+evidence: the event answers *what was attempted*, *by what*, and *why it was
+refused* — exactly what a reviewer needs. A request that fails with no matching
+event means the failure was local, not a policy denial.
+
+In the TUI, the same DENIED event appears in real time as you run the request —
+sandbox identity, binary, destination, and denial reason. Same evidence as the
+log query, live.
+
+.The scripted assertion for this exercise
+[%collapsible]
+====
+[source,bash,subs="attributes+"]
+----
 REQUEST_DENIED=false
 if openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_name} -- \
   curl -fsS --connect-timeout 10 --max-time 30 https://api.github.com/zen; then
@@ -69,10 +165,7 @@ else
 fi
 test "$REQUEST_DENIED" = true && test "$EVIDENCE_FOUND" = true
 ----
-
-The sandbox flushes runtime events to the gateway asynchronously, so the
-evidence query follows a short wait. The OCSF event records the destination,
-binary, and denial reason.
+====
 
 == Exercise 2: Apply the read-only policy
 
@@ -86,14 +179,15 @@ openshell --gateway {raw_gateway_name} policy set {raw_sandbox_name} \
 openshell --gateway {raw_gateway_name} policy get {raw_sandbox_name} --full
 ----
 
-The policy preserves the default filesystem settings and adds a read-only REST
-rule scoped to `/usr/bin/curl`.
+Expected result: the effective policy now shows a read-only REST rule scoped to
+`/usr/bin/curl` for `api.github.com`, without recreating the sandbox.
 
 An allow rule has multiple dimensions:
 destination, protocol, HTTP access mode, and calling binary. A hostname alone
-is not the capability grant.
+is not the capability grant — reading the effective rule line by line is how
+you explain a capability to a reviewer.
 
-Run an allowed GitHub API read:
+Run an allowed GitHub API read with the granted binary:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -102,21 +196,6 @@ STATUS=$(openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_nam
   -o /dev/null -w '%\{http_code\}' \
   https://api.github.com/repos/NVIDIA/OpenShell)
 printf 'GitHub API HTTP %s\n' "$STATUS"
-if [ "$STATUS" = "403" ]; then
-  RATE_LIMIT=$(openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_name} -- \
-    curl -sI --connect-timeout 10 --max-time 30 \
-    https://api.github.com/repos/NVIDIA/OpenShell | grep -i 'x-ratelimit-remaining: 0' || true)
-  if [ -n "$RATE_LIMIT" ]; then
-    echo 'PASS WITH NOTE: the proxy allowed the request; GitHub exhausted the shared unauthenticated rate limit (X-RateLimit-Remaining: 0)'
-    echo 'The connection succeeded through the proxy, which is the property under test. Retry after the limit window resets.'
-  else
-    echo 'FAIL: a 403 without rate-limit headers may be a policy denial; check the gateway events'
-    openshell --gateway {raw_gateway_name} logs {raw_sandbox_name} --since 2m
-    test "$STATUS" = "200"
-  fi
-else
-  test "$STATUS" = "200"
-fi
 ----
 
 Expected result: HTTP 200. GET, HEAD, and OPTIONS are allowed by the read-only
@@ -127,34 +206,56 @@ proxy allowed the connection. A 403 without those headers is a policy denial;
 the gateway events distinguish the two. This is HTTP-method enforcement; it
 cannot guarantee that every GET endpoint is semantically free of side effects.
 
-Repeat the same GET with a binary that is not listed in the rule:
+.Diagnosis for the shared-IP 403 case
+[%collapsible]
+====
+[source,bash,subs="attributes+"]
+----
+if [ "$STATUS" = "403" ]; then
+  RATE_LIMIT=$(openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_name} -- \
+    curl -sI --connect-timeout 10 --max-time 30 \
+    https://api.github.com/repos/NVIDIA/OpenShell | grep -i 'x-ratelimit-remaining: 0' || true)
+  if [ -n "$RATE_LIMIT" ]; then
+    echo 'PASS WITH NOTE: the proxy allowed the request; GitHub exhausted the shared unauthenticated rate limit (X-RateLimit-Remaining: 0)'
+  else
+    echo 'FAIL: a 403 without rate-limit headers may be a policy denial; check the gateway events'
+    openshell --gateway {raw_gateway_name} logs {raw_sandbox_name} --since 2m
+    test "$STATUS" = "200"
+  fi
+fi
+----
+====
+
+Now the negative control: repeat the same read with a binary that is not listed
+in the rule. The capability was granted to `/usr/bin/curl`, not to the sandbox:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-BINARY_DENIED=false
-if openshell --gateway {raw_gateway_name} sandbox exec \
+openshell --gateway {raw_gateway_name} sandbox exec \
   -n {raw_sandbox_name} -- \
-  python3 -c "import urllib.request; urllib.request.urlopen('https://api.github.com/zen', timeout=10)"; then
-  echo 'ERROR: an unlisted binary reached the allowed host'
-else
-  BINARY_DENIED=true
-  echo 'EXPECTED: binary binding rejected python3'
-fi
+  python3 -c "import urllib.request; urllib.request.urlopen('https://api.github.com/zen', timeout=10)"
+----
+
+Expected result: the request fails. Binary binding rejected `python3` even
+though the host is allowed — the grant is scoped to the calling binary.
+
+.Evidence check for the binary denial
+[%collapsible]
+====
+[source,bash,subs="attributes+"]
+----
 sleep 6
 DENIAL_LOG=$(openshell --gateway {raw_gateway_name} logs \
   {raw_sandbox_name} --level info --since 30s)
 printf '%s\n' "$DENIAL_LOG"
-EVIDENCE_FOUND=false
-if printf '%s\n' "$DENIAL_LOG" | grep -Ei 'api\.github\.com' | \
-  grep -Eiq 'deny|denied|blocked'; then
-  EVIDENCE_FOUND=true
-fi
-test "$BINARY_DENIED" = true && test "$EVIDENCE_FOUND" = true
+printf '%s\n' "$DENIAL_LOG" | grep -Ei 'api\.github\.com' | \
+  grep -Eiq 'deny|denied|blocked'
 ----
+====
 
 == Exercise 3: Prove L7 blocking
 
-Attempt a write to the GitHub API, then inspect the policy evidence:
+Attempt a write to the GitHub API with the same allowed host and binary:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -164,12 +265,14 @@ POST_STATUS=$(openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbo
   https://api.github.com/repos/octocat/hello-world/issues \
   -H 'Content-Type: application/json' -d '{"title":"blocked-by-policy"}' || true)
 printf 'POST result: HTTP %s\n' "$POST_STATUS"
+----
 
+Then inspect the policy evidence:
+
+[source,bash,role="execute",subs="attributes+"]
+----
 sleep 6
-DENIAL_LOG=$(openshell --gateway {raw_gateway_name} logs {raw_sandbox_name} --level info --since 30s)
-printf '%s\n' "$DENIAL_LOG"
-printf '%s\n' "$DENIAL_LOG" | grep -Ei 'api\.github\.com' | \
-  grep -Ei 'POST' | grep -Eiq 'deny|denied|blocked'
+openshell --gateway {raw_gateway_name} logs {raw_sandbox_name} --level info --since 30s
 ----
 
 The CONNECT is permitted because `api.github.com` is an allowed host, but the
@@ -178,10 +281,25 @@ path, and denial reason in the OpenShell log. The HTTP status alone is not proof
 of policy enforcement: an unauthenticated write can also receive an upstream
 GitHub `4xx` response. The OpenShell denial event is the required evidence.
 
+.The scripted assertion for this exercise
+[%collapsible]
+====
+[source,bash,subs="attributes+"]
+----
+DENIAL_LOG=$(openshell --gateway {raw_gateway_name} logs {raw_sandbox_name} --level info --since 30s)
+printf '%s\n' "$DENIAL_LOG" | grep -Ei 'api\.github\.com' | \
+  grep -Ei 'POST' | grep -Eiq 'deny|denied|blocked'
+----
+====
+
 The sandbox can reach the approved service, but the policy rejects a POST from
 the same binary to that host.
 
 == Exercise 4: Change and restore a live rule
+
+This exercise is the operational loop a platform admin actually runs when a
+developer requests access: review a narrowly scoped change, apply it live while
+the workload keeps running, verify the result, then restore known-good state.
 
 Use a precise live update to add a temporary read-write REST endpoint while the
 sandbox remains running. The target is the in-cluster `http-echo` service the
@@ -196,6 +314,11 @@ openshell --gateway {raw_gateway_name} policy update {raw_sandbox_name} \
 openshell --gateway {raw_gateway_name} policy get {raw_sandbox_name} --full
 ----
 
+Reading the `--add-endpoint` value: `host:port:access-mode:protocol:enforcement`
+— a single endpoint grant scoped to one binary and one access mode. The
+effective policy now shows the new endpoint. In the TUI, an ALLOWED event for
+`http-echo` appears once the POST succeeds below.
+
 Run a harmless POST against the temporary endpoint:
 
 [source,bash,role="execute",subs="attributes+"]
@@ -206,14 +329,10 @@ STATUS=$(openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_nam
   "http://http-echo.{openshell_namespace}.svc.cluster.local:8080/post" \
   -d 'policy=updated')
 printf 'http-echo HTTP %s\n' "$STATUS"
-test "$STATUS" = "200"
 ----
 
-Expected result: a successful HTTP response. No sandbox recreation was
-required.
-
-This is the operational loop: review a narrowly scoped change, apply it live,
-verify the result, retain the evidence, and restore known-good state.
+Expected result: HTTP 200. No sandbox recreation was required — network policy
+hot-reloads.
 
 Restore the canonical read-only policy and prove the temporary endpoint is
 removed:
@@ -224,7 +343,41 @@ openshell --gateway {raw_gateway_name} policy set {raw_sandbox_name} \
   --policy {automation_repo}/policies/sandbox-policy-quickstart.yaml \
   --wait
 openshell --gateway {raw_gateway_name} policy get {raw_sandbox_name} --full
+----
 
+Expected result: the effective policy no longer contains `http-echo`.
+
+Repeat the POST and confirm the denial returned:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_name} -- \
+  curl -fsS --connect-timeout 10 --max-time 30 \
+  -X POST "http://http-echo.{openshell_namespace}.svc.cluster.local:8080/post" \
+  -d 'policy=reverted'
+----
+
+Expected result: the request does not complete. Verify the denial event:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+sleep 6
+openshell --gateway {raw_gateway_name} logs {raw_sandbox_name} --level info --since 30s
+----
+
+In the TUI, the DENIED event for `http-echo` reappears after the restore — the
+event stream flips ALLOWED back to DENIED in real time as policy changes. This
+is the strongest moment to show on screen in a customer demo.
+
+Confirm that the full policy no longer contains `http-echo` and that the log
+records a denial for that destination. Those two observations distinguish a
+policy denial from an unrelated upstream failure.
+
+.The scripted assertion for the restore
+[%collapsible]
+====
+[source,bash,subs="attributes+"]
+----
 REVERT_DENIED=false
 if openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_name} -- \
   curl -fsS --connect-timeout 10 --max-time 30 \
@@ -245,13 +398,10 @@ if printf '%s\n' "$DENIAL_LOG" | grep -Ei 'http-echo' | \
 fi
 test "$REVERT_DENIED" = true && test "$EVIDENCE_FOUND" = true
 ----
+====
 
-Confirm that the full policy no longer contains `http-echo` and that the log
-records a denial for that destination. Those two observations distinguish a
-policy denial from an unrelated upstream failure.
-
-This is a live policy iteration loop: observe, change the allowlist, verify,
-and restore. Network policies hot-reload. Filesystem and process policies are
+A policy change that cannot be reverted is not a policy change: always close
+the loop. Network policies hot-reload; filesystem and process policies are
 static for a sandbox and require recreation when they change.
 
 == Control layers and evidence
@@ -294,7 +444,9 @@ fi
 ----
 
 Filesystem policy is static for a running sandbox. Create a separate sandbox
-whose startup must fail if Landlock cannot enforce the declared paths:
+whose startup must fail if Landlock cannot enforce the declared paths —
+`hard_requirement` means the sandbox refuses to start rather than running
+without the filesystem boundary:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -303,7 +455,13 @@ openshell --gateway {raw_gateway_name} sandbox create \
   --name landlock-proof --no-auto-providers \
   --policy {automation_repo}/policies/sandbox-policy-landlock-hard.yaml \
   --no-tty -- true
+----
 
+.Readiness wait for the hard-requirement sandbox
+[%collapsible]
+====
+[source,bash,subs="attributes+"]
+----
 LANDLOCK_READY=false
 for i in $(seq 1 30); do
   if openshell --gateway {raw_gateway_name} sandbox exec \
@@ -318,25 +476,37 @@ if [ "$LANDLOCK_READY" != true ]; then
 else
   echo 'Sandbox started; Landlock availability was sufficient for startup'
 fi
+----
+====
 
-POSITIVE_CONTROL=false
-if openshell --gateway {raw_gateway_name} sandbox exec -n landlock-proof -- \
-  sh -c 'touch /tmp/allowed && rm /tmp/allowed'; then
-  POSITIVE_CONTROL=true
-  echo 'EXPECTED: /tmp write succeeded'
-else
-  echo 'ERROR: the allowed /tmp control failed'
-fi
+Expected result: the sandbox starts — the node kernel supports Landlock.
 
-LANDLOCK_DENIED=false
-if openshell --gateway {raw_gateway_name} sandbox exec -n landlock-proof -- \
-  touch /var/tmp/openshell-workshop-probe; then
-  echo 'ERROR: write outside the Landlock allowlist succeeded'
-else
-  LANDLOCK_DENIED=true
-  echo 'EXPECTED: Landlock denied the /var/tmp write'
-fi
+Run the positive control. A write inside the allowlist must succeed:
 
+[source,bash,role="execute",subs="attributes+"]
+----
+openshell --gateway {raw_gateway_name} sandbox exec -n landlock-proof -- \
+  sh -c 'touch /tmp/allowed && rm /tmp/allowed'
+----
+
+Expected result: the command succeeds. This proves the sandbox can write
+normally inside the declared paths.
+
+Run the negative control. A write outside the allowlist must fail:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+openshell --gateway {raw_gateway_name} sandbox exec -n landlock-proof -- \
+  touch /var/tmp/openshell-workshop-probe
+----
+
+Expected result: the command fails with a permission error — Landlock denied
+the path that ordinary permissions allow.
+
+Inspect the logs and remove the proof sandbox:
+
+[source,bash,role="execute",subs="attributes+"]
+----
 openshell --gateway {raw_gateway_name} logs landlock-proof --since 2m
 openshell --gateway {raw_gateway_name} sandbox delete landlock-proof
 test "$LANDLOCK_READY" = true && test "$POSITIVE_CONTROL" = true && \
@@ -371,7 +541,8 @@ Each control prints `[ALLOWED]` or `[BLOCKED]` with the observed HTTP status or
 file result. The allowed GitHub read and the `/sandbox` and `/tmp` writes must
 print `[ALLOWED]`, every denied control must print `[BLOCKED]`, and the process
 check must report the unprivileged `sandbox` user. The script exits non-zero
-when any control produced unexpected evidence.
+when any control produced unexpected evidence — read the failing line to see
+which control layer disagreed with the expected result.
 
 == Exercise: Act as the platform admin
 
@@ -387,22 +558,32 @@ oc -n {openshell_namespace} logs statefulset/openshell --tail=500 | \
   grep -oE 'openshell\.[A-Za-z0-9.]+/[A-Za-z]+' | sort | uniq -c | sort -rn
 ----
 
+Expected result: the sandbox list shows every sandbox in the cluster, and the
+RPC summary counts gateway activity by method — typically `CreateSandbox`,
+`ExecSandbox`, `RelayStream`, and `SubmitPolicyAnalysis` dominate. This is the
+operator's answer to "what did every agent attempt against the gateway?" from
+one vantage point, not just one sandbox.
+
 Pass condition: you can see every sandbox in the cluster and the gateway RPC
 activity by method — sandbox creation, exec relays, policy analysis — across the
 whole environment, not just one sandbox.
 
-For the live operator view of individual decisions, run in an interactive
-second terminal:
+For the live operator view of individual decisions, use the TUI you opened at
+the start of this module. Terminal 1 runs the commands; Terminal 2 streams the
+events as they happen — user-level interaction and operator management side by
+side. Reproduce each earlier control layer while watching the event stream:
 
-[source,bash]
-----
-openshell term --gateway {raw_gateway_name}
-----
+* default-deny curl (Exercise 1) — the DENIED event for `api.github.com`;
+* unbound-binary python3 read (Exercise 2) — the binary-binding denial;
+* L7 POST to GitHub (Exercise 3) — the method denial;
+* `http-echo` allow, restore, deny (Exercise 4) — ALLOWED flipping back to
+  DENIED.
 
-The TUI streams OCSF events in real time: sandbox creation, command execution,
-and network policy enforcement (ALLOWED/DENIED). Repeat a denied request from
-Exercise 1 while it runs and watch the event appear with the sandbox identity,
-binary, destination, and denial reason.
+Each event appears with the sandbox identity, binary, destination, and denial
+reason. This live view is the demo moment: customers see the policy decision
+surface in real time instead of being told about it. The OpenClaw Control UI in
+Module 5 is the same pattern at the user layer — browser chat and tool activity
+alongside CLI evidence; this TUI is the operator-layer equivalent.
 
 Interpretation notes:
 
@@ -451,7 +632,10 @@ The proof sequence is:
 ====
 
 That is stronger than saying "the agent is safe." It establishes a repeatable,
-observable capability boundary.
+observable capability boundary: for every action the agent attempted, you can
+state what was allowed, what was denied, and where the evidence lives. In a
+customer conversation, that distinction is the difference between a security
+claim and a demonstrable control.
 
 Keep `{raw_sandbox_name}` for reference. Complete
 xref:05-module-03-deploy-secure-agent-workspace.adoc[Module 3] only when you are

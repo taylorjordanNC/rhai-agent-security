@@ -209,8 +209,8 @@ oc -n openshell port-forward svc/openshell 8080:8080
 Tell the CLI where the gateway is from another terminal:
 
 ```bash
-openshell gateway add http://127.0.0.1:8080 --local --name continuum-raw
-openshell gateway select continuum-raw
+openshell gateway add http://127.0.0.1:8080 --local --name local-gateway
+openshell gateway select local-gateway
 ```
 
 ### Step 8: Verify
@@ -378,7 +378,7 @@ oc adm policy who-can use scc privileged -n openshell
 **openshell CLI `connection refused` or `Disconnected`:**
 Verify that `oc -n openshell port-forward svc/openshell 8080:8080` is
 still running and that `openshell gateway list` shows
-`http://127.0.0.1:8080` for the `continuum-raw` gateway.
+`http://127.0.0.1:8080` for the `local-gateway` gateway.
 
 **Sandbox stuck in `Creating` state:**
 Check sandbox pod events for image pull or SCC issues:

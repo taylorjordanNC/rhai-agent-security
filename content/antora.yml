@@ -21,7 +21,7 @@ asciidoc:
     openshell_saw_version: '0.0.103-rhaiv.0'
     agent_sandbox_channel: 'preview-0.9'
     openshell_namespace: 'openshell'
-    raw_gateway_name: 'continuum-raw'
+    raw_gateway_name: 'local-gateway'
     raw_sandbox_name: 'policy-lab'
     raw_openclaw_name: 'openclaw-lab'
     raw_openclaw_image: 'ghcr.io/nvidia/openshell-community/sandboxes/openclaw@sha256:c116946b3f9e84791630f21f115ac35c9c9f669af70ec0eef3035d79833a9550'
