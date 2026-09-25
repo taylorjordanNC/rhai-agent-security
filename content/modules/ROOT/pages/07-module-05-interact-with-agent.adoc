@@ -13,8 +13,6 @@ OpenShell sandbox. In this module you will verify a permitted workspace action,
 test a denied filesystem action, inspect runtime evidence, exercise a
 governance rejection, and drive the agent from the browser Control UI.
 
-*Estimated time:* 30 minutes
-
 == Technical context
 
 Agent output is not enforcement evidence. Validate each result from outside the

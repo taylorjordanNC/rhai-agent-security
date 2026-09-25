@@ -27,6 +27,14 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: demo
+  ignoreDifferences:
+    # The incident console scales the shop to 0/2 during Exercise 4 — that is
+    # intentional drift, so Argo must not self-heal (revert) the replica count.
+    - group: apps
+      kind: Deployment
+      name: shop
+      namespace: demo
+      jsonPointers: ["/spec/replicas"]
   syncPolicy:
     automated:
       prune: true

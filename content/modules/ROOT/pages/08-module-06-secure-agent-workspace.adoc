@@ -6,8 +6,6 @@ OpenShift Virtualization, Keycloak, Vault and External Secrets, OpenShell, and
 Argo CD. The goal is to identify ownership and failure boundaries, not only to
 list components.
 
-*Estimated time:* 30 minutes
-
 == Technical context
 
 The raw harness and SAW are not equivalent deployment shapes. The harness makes

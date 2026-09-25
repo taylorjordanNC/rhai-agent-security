@@ -11,10 +11,6 @@ The operational sections below are included from that fork's canonical
 deployment guide. Update the shared partials in the SAW repository when a
 deployment command changes; do not duplicate the procedure in this repository.
 
-*Estimated time:* 90-150 minutes, depending on operator installation, image
-imports, storage, and VM startup. Run this module as prework when class time is
-limited.
-
 == Deployment scope
 
 The raw harness and SAW deployment are separate environments. This installation

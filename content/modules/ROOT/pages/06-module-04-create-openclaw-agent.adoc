@@ -12,8 +12,6 @@ optional installation module or against a facilitator-provisioned environment.
 You will configure OIDC access, validate the deployed resources, inspect failure
 signals, and run OpenClaw through the SAW-managed NemoClaw sandbox.
 
-*Estimated time:* 35 minutes
-
 == Reference architecture mapping
 
 This deployment realizes the reference architectures together, and each workshop

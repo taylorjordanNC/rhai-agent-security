@@ -6,8 +6,6 @@ deployed Secure Agent Workspace. Participants verify governance-signed
 per-agent access, investigate live telemetry, drive a real outage in the
 browser, and confirm the remediation as a human.
 
-*Estimated time:* 45 minutes
-
 == Why this matters
 
 Enterprises do not stall on whether AI agents *can* help operate systems —

@@ -11,8 +11,6 @@ denies; it is that the policy decision is visible, specific, and testable
 without restarting the sandbox. That is the evidence a compliance review or
 customer security conversation actually asks for.
 
-*Estimated time:* 35 minutes
-
 == Technical context
 
 A policy file is desired state, not proof of enforcement. Each exercise compares
