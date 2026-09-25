@@ -40,7 +40,7 @@ The teardown leaves the cluster-scoped Agent Sandbox operator installed because
 another workshop may use it. A cluster administrator can remove that operator
 and its CRDs only after confirming that no other workload depends on them:
 
-[source,bash]
+[source,bash,role="execute"]
 ----
 bash automation/harness/01-basic-openshell/teardown.sh --crd
 ----
@@ -68,7 +68,7 @@ After cluster cleanup, decide whether to retain or securely delete
 gateway registration and cached OIDC state according to the control node's
 credential-retention policy:
 
-[source,bash,subs="attributes+"]
+[source,bash,role="execute",subs="attributes+"]
 ----
 openshell gateway remove {saw_gateway_name} 2>/dev/null || true
 cd "$HOME/git/{saw_repo_dir}"

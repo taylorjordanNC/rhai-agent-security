@@ -36,6 +36,8 @@ make -C {automation_repo} install-openshell \
   OPENSHELL_VERSION={openshell_version}
 ----
 
+image::01-openshell-deploy-success.png[OpenShell deploy success,link=self,window=blank,width=700]
+
 The harness installation sequence is:
 
 . Installs the Red Hat Agent Sandbox operator through OLM, which provides the
@@ -62,12 +64,17 @@ oc -n {openshell_namespace} port-forward svc/openshell 8080:8080 \
   >"$HOME/openshell-port-forward.log" 2>&1 &
 echo $! >"$HOME/openshell-port-forward.pid"
 sleep 2
+----
 
+[source,bash,role="execute",subs="attributes+"]
+----
 openshell gateway remove {raw_gateway_name} 2>/dev/null || true
 openshell gateway add "http://127.0.0.1:8080" --local --name {raw_gateway_name}
 openshell gateway select {raw_gateway_name}
 openshell status
 ----
+
+image::02-openshell-gateway-success.png[OpenShell gateway success,link=self,window=blank,width=700]
 
 The Agent Sandbox controller reconciles the sandbox request, while OpenShell
 provides the gateway and supervisor that enforce the runtime boundary. The
@@ -93,6 +100,8 @@ oc -n {openshell_namespace} get statefulset,pods,svc,pvc
 oc get crd sandboxes.agents.x-k8s.io
 ----
 
+image::03-openshell-verify.png[OpenShell verify success,link=self,window=blank,width=700]
+
 The gateway pod should be `Running`, the PVC should be `Bound`, and the Agent
 Sandbox API should exist. If the gateway is pending, inspect the PVC,
 StorageClass, pod events, and StatefulSet status. The privileged SCC applies to
@@ -109,6 +118,12 @@ OpenShell, not NemoClaw:
 [source,bash,role="execute",subs="attributes+"]
 ----
 openshell sandbox create --name {raw_sandbox_name} --no-auto-providers --no-tty -- true
+----
+
+image::04-openshell-create-test-sandbox.png[OpenShell create test sandbox success,link=self,window=blank,width=700]
+
+[source,bash,role="execute",subs="attributes+"]
+----
 openshell sandbox list
 openshell sandbox get {raw_sandbox_name}
 oc -n {openshell_namespace} get pods -o wide
@@ -165,7 +180,10 @@ openshell --gateway {raw_gateway_name} sandbox delete {raw_openclaw_name} 2>/dev
 openshell --gateway {raw_gateway_name} sandbox create \
   --name {raw_openclaw_name} --no-auto-providers \
   --from {raw_openclaw_image} --no-tty -- true
+----
 
+[source,bash,role="execute",subs="attributes+"]
+----
 OPENCLAW_READY=false
 for i in $(seq 1 30); do
   if openshell --gateway {raw_gateway_name} sandbox exec \
@@ -180,6 +198,8 @@ test "$OPENCLAW_READY" = true
 openshell --gateway {raw_gateway_name} sandbox exec \
   -n {raw_openclaw_name} -- openclaw --version
 ----
+
+image::05-openshell-deploy-openclaw.png[OpenShell deploy OpenClaw success,link=self,window=blank,width=700]
 
 Pass condition: the sandbox is `Ready` and `openclaw --version` reports the
 agent runtime inside the pod. Connect interactively with

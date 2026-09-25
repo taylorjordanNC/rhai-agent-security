@@ -71,6 +71,17 @@ pinned to `{openshell_saw_version}` in the guest VM. Its Makefile targets
 configure the gateway, select a workspace, and connect to the sandbox. They do
 not use `nemoclaw onboard` on the participant workstation.
 
+== Clone the workshop manifests
+
+The Kustomize manifests referenced throughout this guide live in the workshop repository.
+
+[source,bash,role="execute",subs="attributes"]
+----
+git clone {repo-url} ~/rhai-agent-security
+cd ~/rhai-agent-security
+ls automation
+----
+
 == Install the command-line tools
 
 Install `oc` from the OpenShift console's client download page or the
@@ -82,7 +93,7 @@ may already contain both tools.
 Install the exact OpenShell client from the workshop repository root. The
 installer selects the Linux x86_64, Linux ARM64, or Apple Silicon artifact:
 
-[source,bash,subs="attributes+"]
+[source,bash,role="execute",subs="attributes+"]
 ----
 OPENSHELL_VERSION={openshell_version} \
 OPENSHELL_INSTALL_DIR="$HOME/openshell-cli" \
@@ -120,7 +131,7 @@ BOM-configured NemoClaw runtime in the VM.
 Install and verify the cluster-facing tools before connecting. Run the core
 check in every new terminal:
 
-[source,bash,subs="attributes+"]
+[source,bash,role="execute",subs="attributes+"]
 ----
 for tool in oc helm git curl openssl make; do
   command -v "$tool"
@@ -132,7 +143,7 @@ test "$(openshell --version | awk '{print $NF}')" = "{openshell_version}"
 
 SAW operation additionally requires these tools on the control node:
 
-[source,bash,subs="attributes+"]
+[source,bash,role="execute",subs="attributes+"]
 ----
 for tool in kubectl virtctl jq ssh lsof python3; do
   command -v "$tool"
@@ -152,7 +163,7 @@ The raw OpenShell assets are in this repository's `automation/` directory. SAW
 deployment assets remain in the Secure Agent Workspace fork and are used from
 that repository directly:
 
-[source,bash,subs="attributes+"]
+[source,bash,role="execute",subs="attributes+"]
 ----
 test -f {automation_repo}/Makefile
 test -f {automation_repo}/harness/01-basic-openshell/install.sh

@@ -13,7 +13,7 @@ answer key is the facilitator's rubric.
 
 Start from the repository root with the raw gateway selected:
 
-[source,bash,subs="attributes+"]
+[source,bash,role="execute",subs="attributes+"]
 ----
 openshell gateway select {raw_gateway_name}
 openshell --gateway {raw_gateway_name} status

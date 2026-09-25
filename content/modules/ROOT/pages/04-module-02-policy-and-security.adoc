@@ -47,25 +47,29 @@ focuses on the network boundary.
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
 openshell --gateway {raw_gateway_name} policy get {raw_sandbox_name} --full
 
 REQUEST_DENIED=false
 if openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_name} -- \
   curl -fsS --connect-timeout 10 --max-time 30 https://api.github.com/zen; then
-  echo 'ERROR: the default policy allowed egress'
+  echo -e "$RED ERROR: the default policy allowed egress$NC"
 else
   REQUEST_DENIED=true
-  echo 'The request failed; verify the gateway denial record next.'
+  echo -e "$GREEN The request failed; verify the gateway denial record next.$NC"
 fi
 sleep 6
 DENIAL_LOG=$(openshell --gateway {raw_gateway_name} logs {raw_sandbox_name} --since 30s)
-printf '%s\n' "$DENIAL_LOG"
+echo -e "$DENIAL_LOG"
 EVIDENCE_FOUND=false
-if printf '%s\n' "$DENIAL_LOG" | \
+if echo -e "$DENIAL_LOG" | \
   grep -Ei 'api\.github\.com' | grep -Eiq 'deny|denied|blocked'; then
   EVIDENCE_FOUND=true
 else
-  echo 'ERROR: no api.github.com gateway-denial evidence was found'
+  echo -e "$RED ERROR: no api.github.com gateway-denial evidence was found$NC"
 fi
 test "$REQUEST_DENIED" = true && test "$EVIDENCE_FOUND" = true
 ----
@@ -76,7 +80,15 @@ binary, and denial reason.
 
 == Exercise 2: Apply the read-only policy
 
-Apply the workshop's bundled copy of the OpenShell read-only policy:
+Inspect the workshop's bundled copy of the OpenShell read-only policy before
+applying it:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+cat {automation_repo}/policies/sandbox-policy-quickstart.yaml
+----
+
+Apply the read-only policy:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -97,20 +109,25 @@ Run an allowed GitHub API read:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+GREEN='\033[0;32m'
+ORANGE='\033[38;5;214m'
+RED='\033[0;31m'
+NC='\033[0m'
+
 STATUS=$(openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_name} -- \
   curl -sS --connect-timeout 10 --max-time 30 \
   -o /dev/null -w '%\{http_code\}' \
   https://api.github.com/repos/NVIDIA/OpenShell)
-printf 'GitHub API HTTP %s\n' "$STATUS"
+echo -e "$GREEN GitHub API HTTP $STATUS$NC"
 if [ "$STATUS" = "403" ]; then
   RATE_LIMIT=$(openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_name} -- \
     curl -sI --connect-timeout 10 --max-time 30 \
     https://api.github.com/repos/NVIDIA/OpenShell | grep -i 'x-ratelimit-remaining: 0' || true)
   if [ -n "$RATE_LIMIT" ]; then
-    echo 'PASS WITH NOTE: the proxy allowed the request; GitHub exhausted the shared unauthenticated rate limit (X-RateLimit-Remaining: 0)'
+    echo -e "$ORANGE PASS WITH NOTE: the proxy allowed the request; GitHub exhausted the shared unauthenticated rate limit (X-RateLimit-Remaining: 0)$NC"
     echo 'The connection succeeded through the proxy, which is the property under test. Retry after the limit window resets.'
   else
-    echo 'FAIL: a 403 without rate-limit headers may be a policy denial; check the gateway events'
+    echo -e "$RED FAIL: a 403 without rate-limit headers may be a policy denial; check the gateway events$NC"
     openshell --gateway {raw_gateway_name} logs {raw_sandbox_name} --since 2m
     test "$STATUS" = "200"
   fi
@@ -131,21 +148,25 @@ Repeat the same GET with a binary that is not listed in the rule:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
 BINARY_DENIED=false
 if openshell --gateway {raw_gateway_name} sandbox exec \
   -n {raw_sandbox_name} -- \
   python3 -c "import urllib.request; urllib.request.urlopen('https://api.github.com/zen', timeout=10)"; then
-  echo 'ERROR: an unlisted binary reached the allowed host'
+  echo -e "$RED ERROR: an unlisted binary reached the allowed host$NC"
 else
   BINARY_DENIED=true
-  echo 'EXPECTED: binary binding rejected python3'
+  echo -e "$GREEN EXPECTED: binary binding rejected python3$NC"
 fi
 sleep 6
 DENIAL_LOG=$(openshell --gateway {raw_gateway_name} logs \
   {raw_sandbox_name} --level info --since 30s)
-printf '%s\n' "$DENIAL_LOG"
+echo -e "$DENIAL_LOG"
 EVIDENCE_FOUND=false
-if printf '%s\n' "$DENIAL_LOG" | grep -Ei 'api\.github\.com' | \
+if echo -e "$DENIAL_LOG" | grep -Ei 'api\.github\.com' | \
   grep -Eiq 'deny|denied|blocked'; then
   EVIDENCE_FOUND=true
 fi
@@ -158,17 +179,25 @@ Attempt a write to the GitHub API, then inspect the policy evidence:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
 POST_STATUS=$(openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_name} -- \
   curl -sS --connect-timeout 10 --max-time 30 \
   -X POST -o /dev/null -w '%\{http_code\}' \
   https://api.github.com/repos/octocat/hello-world/issues \
   -H 'Content-Type: application/json' -d '{"title":"blocked-by-policy"}' || true)
-printf 'POST result: HTTP %s\n' "$POST_STATUS"
+if [ "$POST_STATUS" = "403" ]; then
+  echo -e "$GREEN POST result: HTTP $POST_STATUS$NC"
+else
+  echo -e "$RED POST result: HTTP $POST_STATUS$NC"
+fi
 
 sleep 6
 DENIAL_LOG=$(openshell --gateway {raw_gateway_name} logs {raw_sandbox_name} --level info --since 30s)
-printf '%s\n' "$DENIAL_LOG"
-printf '%s\n' "$DENIAL_LOG" | grep -Ei 'api\.github\.com' | \
+echo -e "$DENIAL_LOG"
+echo -e "$DENIAL_LOG" | grep -Ei 'api\.github\.com' | \
   grep -Ei 'POST' | grep -Eiq 'deny|denied|blocked'
 ----
 
@@ -200,12 +229,20 @@ Run a harmless POST against the temporary endpoint:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
 STATUS=$(openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_name} -- \
   curl -sS --connect-timeout 10 --max-time 30 \
   -X POST -o /dev/null -w '%\{http_code\}' \
   "http://http-echo.{openshell_namespace}.svc.cluster.local:8080/post" \
   -d 'policy=updated')
-printf 'http-echo HTTP %s\n' "$STATUS"
+if [ "$STATUS" = "200" ]; then
+  echo -e "$GREEN http-echo HTTP $STATUS$NC"
+else
+  echo -e "$RED http-echo HTTP $STATUS$NC"
+fi
 test "$STATUS" = "200"
 ----
 
@@ -220,6 +257,10 @@ removed:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
 openshell --gateway {raw_gateway_name} policy set {raw_sandbox_name} \
   --policy {automation_repo}/policies/sandbox-policy-quickstart.yaml \
   --wait
@@ -230,16 +271,16 @@ if openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_name} -- 
   curl -fsS --connect-timeout 10 --max-time 30 \
   -X POST "http://http-echo.{openshell_namespace}.svc.cluster.local:8080/post" \
   -d 'policy=reverted'; then
-  echo 'ERROR: the reverted policy still allows http-echo'
+  echo -e "$RED ERROR: the reverted policy still allows http-echo$NC"
 else
   REVERT_DENIED=true
-  echo 'Request did not complete; verify the OpenShell denial event next.'
+  echo -e "$GREEN Request did not complete; verify the OpenShell denial event next.$NC"
 fi
 sleep 6
 DENIAL_LOG=$(openshell --gateway {raw_gateway_name} logs {raw_sandbox_name} --level info --since 30s)
-printf '%s\n' "$DENIAL_LOG"
+echo -e "$DENIAL_LOG"
 EVIDENCE_FOUND=false
-if printf '%s\n' "$DENIAL_LOG" | grep -Ei 'http-echo' | \
+if echo -e "$DENIAL_LOG" | grep -Ei 'http-echo' | \
   grep -Eiq 'deny|denied|blocked'; then
   EVIDENCE_FOUND=true
 fi
@@ -284,20 +325,36 @@ a policy problem:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+GREEN='\033[0;32m'
+ORANGE='\033[38;5;214m'
+NC='\033[0m'
+
 LOWEST_KERNEL=$(oc get nodes -o jsonpath='{range .items[*]}{.status.nodeInfo.kernelVersion}{"\n"}\{end\}' | sort -V | head -1)
-printf 'Lowest node kernel: %s\n' "$LOWEST_KERNEL"
+echo -e "Lowest node kernel: $LOWEST_KERNEL"
 if [ "$(printf '%s\n5.13\n' "$LOWEST_KERNEL" | sort -V | head -1)" = "5.13" ]; then
-  echo 'EXPECTED: all nodes meet the Landlock kernel requirement (>= 5.13)'
+  echo -e "$GREEN EXPECTED: all nodes meet the Landlock kernel requirement (>= 5.13)$NC"
 else
-  echo 'WARNING: a node kernel is older than 5.13; hard_requirement cannot start'
+  echo -e "$ORANGE WARNING: a node kernel is older than 5.13; hard_requirement cannot start$NC"
 fi
 ----
 
-Filesystem policy is static for a running sandbox. Create a separate sandbox
-whose startup must fail if Landlock cannot enforce the declared paths:
+Filesystem policy is static for a running sandbox. Inspect the `hard_requirement`
+policy before creating the sandbox:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+cat {automation_repo}/policies/sandbox-policy-landlock-hard.yaml
+----
+
+Create a separate sandbox whose startup must fail if Landlock cannot enforce
+the declared paths:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
 openshell --gateway {raw_gateway_name} sandbox delete landlock-proof 2>/dev/null || true
 openshell --gateway {raw_gateway_name} sandbox create \
   --name landlock-proof --no-auto-providers \
@@ -314,27 +371,27 @@ for i in $(seq 1 30); do
   sleep 5
 done
 if [ "$LANDLOCK_READY" != true ]; then
-  echo 'ERROR: hard-requirement sandbox did not become Ready; inspect Landlock availability'
+  echo -e "$RED ERROR: hard-requirement sandbox did not become Ready; inspect Landlock availability$NC"
 else
-  echo 'Sandbox started; Landlock availability was sufficient for startup'
+  echo -e "$GREEN Sandbox started; Landlock availability was sufficient for startup$NC"
 fi
 
 POSITIVE_CONTROL=false
 if openshell --gateway {raw_gateway_name} sandbox exec -n landlock-proof -- \
   sh -c 'touch /tmp/allowed && rm /tmp/allowed'; then
   POSITIVE_CONTROL=true
-  echo 'EXPECTED: /tmp write succeeded'
+  echo -e "$GREEN EXPECTED: /tmp write succeeded$NC"
 else
-  echo 'ERROR: the allowed /tmp control failed'
+  echo -e "$RED ERROR: the allowed /tmp control failed$NC"
 fi
 
 LANDLOCK_DENIED=false
 if openshell --gateway {raw_gateway_name} sandbox exec -n landlock-proof -- \
   touch /var/tmp/openshell-workshop-probe; then
-  echo 'ERROR: write outside the Landlock allowlist succeeded'
+  echo -e "$RED ERROR: write outside the Landlock allowlist succeeded$NC"
 else
   LANDLOCK_DENIED=true
-  echo 'EXPECTED: Landlock denied the /var/tmp write'
+  echo -e "$GREEN EXPECTED: Landlock denied the /var/tmp write$NC"
 fi
 
 openshell --gateway {raw_gateway_name} logs landlock-proof --since 2m
@@ -394,7 +451,7 @@ whole environment, not just one sandbox.
 For the live operator view of individual decisions, run in an interactive
 second terminal:
 
-[source,bash]
+[source,bash,role="execute",subs="attributes+"]
 ----
 openshell term --gateway {raw_gateway_name}
 ----
