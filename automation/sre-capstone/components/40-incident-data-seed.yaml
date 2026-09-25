@@ -24,7 +24,10 @@ metadata:
     app.kubernetes.io/part-of: sre-copilot-capstone
     argocd.argoproj.io/sync-wave: "4"
 rules:
-  - apiGroups: [""]
+  # MLflow's kubernetes-auth plugin submits its SelfSubjectAccessReview in the
+  # mlflow.kubeflow.org API group (the plugin's default auth group), which has
+  # no registered resource types — RBAC rules still evaluate for it.
+  - apiGroups: ["mlflow.kubeflow.org"]
     resources: ["experiments"]
     verbs: ["get", "list", "create", "update", "delete", "patch"]
 ---
@@ -102,13 +105,17 @@ data:
 
 
     def resolve_experiment():
-        exp, _ = api("GET",
-                     "/mlflow/api/2.0/mlflow/experiments/get-by-name?experiment_name="
-                     + EXPERIMENT_NAME, expect_error_ok=True)
+        exp, status = api("GET",
+                          "/mlflow/api/2.0/mlflow/experiments/get-by-name?experiment_name="
+                          + EXPERIMENT_NAME, expect_error_ok=True)
         exp_id = (exp.get("experiment") or {}).get("experiment_id")
         if exp_id:
             print(f"experiment {EXPERIMENT_NAME} found: id {exp_id}")
             return exp_id
+        # Only a true not-found (RESOURCE_DOES_NOT_EXIST) falls through to create;
+        # anything else (e.g. permission denied) is a hard error.
+        if "RESOURCE_DOES_NOT_EXIST" not in str(exp.get("error", "")):
+            raise SystemExit(f"ERROR resolving experiment ({status}): {exp}")
         print(f"experiment {EXPERIMENT_NAME} not found — creating")
         created, status = api("POST", "/mlflow/api/2.0/mlflow/experiments/create",
                               {"name": EXPERIMENT_NAME})
