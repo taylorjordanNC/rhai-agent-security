@@ -201,6 +201,12 @@ Evidence checkpoint: do not treat `helm install` success as proof. The
 restarts repeatedly, check `oc -n {guardrails_namespace} logs` for a missing
 Presidio dependency (see the caveat in Exercise 3).
 
+GUI view: open the OpenShift Console tab and navigate to Workloads >
+Deployments in the `{guardrails_namespace}` project. The operator-rendered
+Deployment appears there — the visual reminder of the ownership split above:
+desired state lives in the CR you edit; the Deployment is the operator's
+rendering of it.
+
 === What the operator did
 
 The `helm install` created three kinds of state, and they fail differently.

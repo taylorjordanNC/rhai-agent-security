@@ -181,7 +181,36 @@ policy.
 The `metrics` agent's backend answers 401 without a bearer token — the
 authentication requirement is itself evidence that the path works. With
 the facilitator-vended read-only service account token, the agent queries
-real cluster metrics. Ask the agent (through the Control UI or the TUI) to
+real cluster metrics.
+
+Open the agent surfaces alongside your evidence queries. The fleet sandboxes
+live on `{saw_gateway_name}`, so both agent surfaces from earlier modules
+reach them:
+
+* *Control UI (browser)* — the dashboard Route forwards only `{saw_sandbox}`;
+  the fleet sandboxes use the shipped tunnel, as in Module 5. From
+  `$HOME/git/{saw_repo_dir}`:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+SANDBOX_NAME=metrics GATEWAY_NAME={saw_gateway_name} \
+  ./scripts/openshell-saw-gui.sh
+----
+
+Open the printed URL and chat with the `metrics` agent while watching tool
+activity live.
+
+* *OpenShell TUI (operator view)* — in a second terminal, as in Module 2:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+openshell term --gateway {saw_gateway_name}
+----
+
+Keep the evidence queries below in the first terminal: user-level interaction
+and operator management side by side.
+
+Ask the agent (through the Control UI or the TUI) to
 check the health of the `demo` namespace, or query directly:
 
 [source,bash,role="execute",subs="attributes+"]
@@ -268,10 +297,31 @@ openshell --gateway {saw_gateway_name} sandbox exec -n traces -- \
     "http://telemetry-proxy.openshell-agents.svc.cluster.local:8081/mlflow/api/3.0/mlflow/traces/search"'
 ----
 
+GUI view: the MLflow instance also serves a tracking UI. Check whether the
+environment exposes a Route for it:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+oc -n redhat-ods-applications get route
+----
+
+If an MLflow Route is listed, open it and find the `sre-copilot-fleet`
+experiment: the planted `INC-4127` session appears as a visual trace
+waterfall — each span a tool call the fleet made, tagged with the role that
+ran it. Seeing the same evidence as a picture next to the CLI output is the
+"agents auditing agents" demo moment. If no Route is exposed, the CLI trace
+reads above are the same evidence.
+
 == Exercise 4: The incident loop
 
 Open the incident console and drive a real outage, with the fleet
-investigating:
+investigating. The console deploys to the `{saw_namespace}` namespace — get
+its URL first:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+oc -n {saw_namespace} get route incident-console
+----
 
 . Record the healthy baseline: the `demo/shop` deployment reports two
   ready replicas.
