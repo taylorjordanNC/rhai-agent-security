@@ -85,12 +85,14 @@ data:
     TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
 
-    def api(method, path, body=None, expect_error_ok=False):
+    def api(method, path, body=None, expect_error_ok=False, extra_headers=None):
         token = open(TOKEN_PATH).read().strip()
         req = urllib.request.Request(PROXY + path, method=method)
         req.add_header("Authorization", "Bearer " + token)
         req.add_header("X-MLFLOW-WORKSPACE", WORKSPACE)
         req.add_header("Content-Type", "application/json")
+        for key, value in (extra_headers or {}).items():
+            req.add_header(key, value)
         data = json.dumps(body).encode() if body is not None else None
         try:
             with urllib.request.urlopen(req, data=data, timeout=30) as r:
@@ -201,12 +203,14 @@ data:
                                              "value": {"stringValue": service}}]},
                 "scopeSpans": [{"scope": {"name": "sre-copilot-fleet"}, "spans": spans}],
             }]}
-            _, status = api("POST", "/v1/traces", payload, expect_error_ok=True)
+            resp, status = api("POST", "/v1/traces", payload, expect_error_ok=True,
+                               extra_headers={"x-mlflow-experiment-id": exp_id})
             if status == 200:
                 ingested += 1
             else:
                 failed += 1
-                print(f"WARN: {root} ingest -> HTTP {status}")
+                print(f"WARN: {root} ingest -> HTTP {status}: "
+                      f"{str(resp.get('error', resp))[:200]}")
         print(f"ingested {ingested} traces, {failed} failures")
         if failed:
             raise SystemExit(f"{failed} trace(s) failed to ingest")

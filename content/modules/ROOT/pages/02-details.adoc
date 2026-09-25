@@ -130,6 +130,10 @@ helm version
 test "$(openshell --version | awk '{print $NF}')" = "{openshell_version}"
 ----
 
+Expected result: every tool prints its install path — a missing line names the
+absent tool. The final `test` line is the version pin: it fails if the
+installed OpenShell client is anything but `{openshell_version}`.
+
 SAW operation additionally requires these tools on the control node:
 
 [source,bash,subs="attributes+"]
@@ -140,6 +144,9 @@ done
 virtctl version --client
 python3 -c 'import yaml'
 ----
+
+Expected result: the same — every path printed, `virtctl` reporting a client
+version, and the PyYAML import exiting silently when present.
 
 The OpenShell CLI must report `{openshell_version}`. The SAW guest gateway reports the
 more specific `{openshell_saw_version}` build; that is the expected Red Hat SAW
@@ -160,6 +167,11 @@ test -f {automation_repo}/policies/sandbox-policy-quickstart.yaml
 test -n "$(git ls-remote --heads {saw_repo_url} refs/heads/{saw_repo_branch})"
 ----
 
+Expected result: silence. The `test -f` commands confirm the automation
+checkout is at the repository root; the final command confirms the SAW fork's
+`{saw_repo_branch}` branch is reachable, since the deployment assets are pulled
+from it.
+
 == Run the OpenShift pre-flight check
 
 Confirm the cluster context and storage before installing:
@@ -172,6 +184,15 @@ oc get storageclass
 oc auth can-i create subscriptions.operators.coreos.com -n openshift-operators
 oc auth can-i use scc/privileged
 ----
+
+What each command establishes:
+
+* `whoami` and `--show-server` confirm you are authenticated to the intended
+  cluster before installing anything;
+* `get storageclass` confirms the default storage the gateway PVC will bind to;
+* the two `auth can-i` checks are the permission gates: creating an OLM
+  Subscription (the Agent Sandbox operator) and using the privileged SCC (the
+  sandbox service account). Both must print `yes`.
 
 For a facilitator-provisioned SAW workspace, check the VM and setup Job:
 

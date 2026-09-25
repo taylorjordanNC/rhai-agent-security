@@ -1,6 +1,12 @@
 = Module 4: Validate and Operate Secure Agent Workspace
 :navtitle: Validate and Operate SAW
 
+Modules 1-2 proved each control on a pod boundary. This module moves the same
+agent into the production shape customers deploy: a dedicated VM with identity,
+secrets, and GitOps governance around it. The validation flow is also a
+platform admin's day-2 checklist — the same steps to run when you inherit or
+demo an environment.
+
 This is the required entry point for SAW exercises. Use it after completing the
 optional installation module or against a facilitator-provisioned environment.
 You will configure OIDC access, validate the deployed resources, inspect failure
@@ -124,12 +130,32 @@ Confirm the infrastructure state before entering the agent sandbox:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+oc -n {saw_namespace} get job/{saw_gateway_name}-setup \
+  vm/{saw_gateway_name} vmi/{saw_gateway_name}
+oc -n {saw_gitops_namespace} get applications.argoproj.io
+----
+
+Expected result: the setup Job is `Complete`, the VMI is `Running`, and the
+owning Argo CD applications are `Synced` and `Healthy`. This is the
+reconciliation chain: GitOps owns the pattern, the pattern owns the Job, and
+the Job configures the VM.
+
+.The jsonpath pass conditions for this exercise
+[%collapsible]
+====
+[source,bash,subs="attributes+"]
+----
 test "$(oc -n {saw_namespace} get job/{saw_gateway_name}-setup \
   -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}')" = "True"
 test "$(oc -n {saw_namespace} get vmi/{saw_gateway_name} \
   -o jsonpath='{.status.phase}')" = "Running"
-oc -n {saw_gitops_namespace} get applications.argoproj.io
 ----
+====
+
+GUI view: open the OpenShift Console tab and navigate to Virtualization >
+VirtualMachines in the `{saw_namespace}` project. The workspace VM is the
+production answer to "what does the agent run on?" — a dedicated machine, not
+a pod.
 
 Validate the BOM-created workspaces and sandboxes:
 
@@ -142,14 +168,30 @@ and `toolbox`; `{saw_workspace}` must contain `{saw_sandbox}` and `toolbox`.
 
 == Exercise 3: Diagnose an incomplete deployment
 
-If validation fails, inspect each reconciliation layer before rerunning setup:
+If validation fails, inspect each reconciliation layer before rerunning setup.
+The Argo CD application is the outermost layer — if it is not `Synced`, nothing
+below it can be trusted:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
 oc -n {saw_gitops_namespace} get applications.argoproj.io
+----
+
+The setup Job configures the VM over SSH; a failed Job means the VM exists but
+the runtime inside it was never onboarded:
+
+[source,bash,role="execute",subs="attributes+"]
+----
 oc -n {saw_namespace} get job/{saw_gateway_name}-setup \
   vm/{saw_gateway_name} vmi/{saw_gateway_name}
 oc -n {saw_namespace} logs job/{saw_gateway_name}-setup --tail=80
+----
+
+The setup Job log names the failing onboarding step; the sandbox list shows
+what the gateway actually provisioned:
+
+[source,bash,role="execute",subs="attributes+"]
+----
 openshell --gateway {saw_gateway_name} sandbox list --workspace {saw_workspace}
 ----
 
@@ -176,15 +218,27 @@ workspace. The agent reaches the virtual `inference.local` route; the
 gateway-side provider holds the upstream endpoint and credential. The
 standalone `nemoclaw onboard` workflow is not used.
 
+Expected result: the OpenClaw TUI opens in the terminal, connected to the
+agent inside the sandbox. This is the user surface — type a prompt here and
+the agent works in its permitted workspace.
+
 Confirm the sandbox and its policy from a second terminal:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
 cd "$HOME/git/{saw_repo_dir}"
 openshell gateway select {saw_gateway_name}
+----
+
+[source,bash,role="execute",subs="attributes+"]
+----
 openshell sandbox list --workspace {saw_workspace}
 openshell policy get {saw_sandbox} --workspace {saw_workspace} --full
 ----
+
+Expected result: the sandbox is listed in the workspace, and the effective
+policy shows the filesystem and network rules OpenShell enforces around the
+agent while you drive it from the TUI.
 
 The sandbox is managed by OpenShell and provisioned by SAW. Do not create a
 second sandbox with `nemoclaw onboard` or point the standalone NemoClaw CLI at

@@ -1,6 +1,13 @@
 = Module 5: Test Agent Capabilities and Governance
 :navtitle: Test Agent Capabilities
 
+Modules 1-2 proved the policy controls on a pod boundary. This module tests
+the same boundaries around a model-backed agent in the production VM shape,
+with a human driving it from a browser. It covers what a customer needs to
+prove: the agent writes only where the policy allows, governance rejects
+unapproved provider changes, and every claim can be checked from outside the
+agent.
+
 The agent is model-backed and running inside a SAW-provisioned NemoClaw
 OpenShell sandbox. In this module you will verify a permitted workspace action,
 test a denied filesystem action, inspect runtime evidence, exercise a
@@ -35,9 +42,22 @@ prove that paths outside the allowlist are denied.
 
 == Exercise 2: Test a denied filesystem action
 
-Attempt a write outside the declared workspace and then inspect recent events:
+Attempt a write outside the declared workspace:
 
 [source,bash,role="execute",subs="attributes+"]
+----
+openshell --gateway {saw_gateway_name} sandbox exec \
+  -n {saw_sandbox} --workspace {saw_workspace} -- \
+  touch /var/tmp/saw-boundary-probe
+----
+
+Expected result: the command fails. The path is outside the Landlock
+allowlist, so the kernel refuses the write.
+
+.Cleanup for the unexpected-success case
+[%collapsible]
+====
+[source,bash,subs="attributes+"]
 ----
 if openshell --gateway {saw_gateway_name} sandbox exec \
   -n {saw_sandbox} --workspace {saw_workspace} -- \
@@ -46,20 +66,28 @@ if openshell --gateway {saw_gateway_name} sandbox exec \
   openshell --gateway {saw_gateway_name} sandbox exec \
     -n {saw_sandbox} --workspace {saw_workspace} -- \
     rm -f /var/tmp/saw-boundary-probe
-else
-  echo 'Write denied outside the Landlock allowlist'
 fi
+----
+====
+
+Then inspect recent events:
+
+[source,bash,role="execute",subs="attributes+"]
+----
 openshell --gateway {saw_gateway_name} logs {saw_sandbox} \
   --workspace {saw_workspace} --since 2m
 ----
 
+[IMPORTANT]
+====
 Attribute the denial to Landlock, not to a Unix permission or SELinux denial:
-the probed directory is world-writable (mode 1777), so plain permissions cannot
-deny the sandbox user there, and the successful `/sandbox` write from Exercise 1
-confirms the allowlist is what differentiates. Landlock filesystem denials are
-kernel-silent — the kernel returns EACCES with no notification, so the log
-query above shows only control-plane noise and no denial runtime event. The
-failing `touch` itself is the evidence.
+the probed directory is world-writable (mode 1777), so plain permissions
+cannot deny the sandbox user there, and the successful `/sandbox` write from
+Exercise 1 confirms the allowlist is what differentiates. Landlock filesystem
+denials are kernel-silent — the kernel returns EACCES with no notification, so
+the log query above shows only control-plane noise and no denial runtime
+event. The failing `touch` itself is the evidence.
+====
 
 == Exercise 3: Inspect managed capabilities
 
@@ -75,12 +103,34 @@ The workshop checkout is read-only and the GitHub profile is already present, so
 do not run a helper that commits and pushes profile changes. Persistent changes
 require a writable fork tracked by Argo CD and a reviewed pull request.
 
-First verify that the authenticated profile-list operation succeeds. Then test
-that the interceptor rejects an unvended provider type:
+Verify that the authenticated profile-list operation succeeds:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-openshell --gateway "$OPENSHELL_SAW_NAME" provider list-profiles >/dev/null
+openshell --gateway "$OPENSHELL_SAW_NAME" provider list-profiles
+----
+
+Expected result: the workshop's GitHub profile is listed — authenticated reads
+of the governance data work for your identity.
+
+Then test that the interceptor rejects an unvended provider type:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+openshell --gateway "$OPENSHELL_SAW_NAME" provider create \
+  --name workshop-blocked --type custom --credential key=value
+----
+
+Expected result: the request is rejected with an error naming the unvended
+type. This verifies fail-closed governance for the intercepted
+`CreateProvider` operation. It does not imply that every operation in the VM
+traverses the interceptor.
+
+.Scripted assertion for the rejection
+[%collapsible]
+====
+[source,bash,subs="attributes+"]
+----
 if OUTPUT=$(openshell --gateway "$OPENSHELL_SAW_NAME" provider create \
   --name workshop-blocked --type custom --credential key=value 2>&1); then
   echo 'ERROR: custom provider creation unexpectedly succeeded'
@@ -91,13 +141,11 @@ else
   echo 'EXPECTED: authenticated request was rejected for an unvended type'
 fi
 ----
-
-This verifies fail-closed governance for the intercepted `CreateProvider`
-operation. It does not imply that every operation in the VM traverses the
-interceptor.
+====
 
 For lower-level live network activity and approval prompts, use the OpenShell
-TUI:
+TUI — as in Module 2, run it in a second terminal and leave it open while you
+work, so the operator view streams events while you drive the agent:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -119,34 +167,56 @@ route traffic into the sandbox with the gateway's native `openshell forward`
 RPC. The daemon binds loopback inside the sandbox, so the Route only works
 through that authenticated forward; no manual port plumbing is involved.
 
-Confirm the daemon is listening inside the sandbox, then acquire the UI
-token. The token authenticates the UI session and is a credential — treat
-the token-bearing URL like a password. The `openclaw` CLI redacts the token,
-so read it from the sandbox config file, the same method the shipped
-`openshell-saw-gui.sh` script uses:
+Confirm the daemon is listening inside the sandbox:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
 openshell --gateway {saw_gateway_name} sandbox exec \
   -n {saw_sandbox} --workspace {saw_workspace} --no-tty -- \
   sh -c 'ss -ltn | grep 18789 || echo "daemon not listening"'
+----
+
+Expected result: a listening line on port 18789 — the agent's WebSocket gateway
+bound to loopback inside the sandbox. `daemon not listening` means the setup
+Job's wiring did not finish; fix that before opening the UI.
+
+Then acquire the UI token. The token authenticates the UI session and is a
+credential — treat the token-bearing URL like a password. The `openclaw` CLI
+redacts the token, so read it from the sandbox config file: the python
+one-liner extracts `gateway.auth.token` from `openclaw.json`, the same method
+the shipped `openshell-saw-gui.sh` script uses:
+
+[source,bash,role="execute",subs="attributes+"]
+----
 TOKEN=$(openshell --gateway {saw_gateway_name} sandbox exec \
   -n {saw_sandbox} --workspace {saw_workspace} --no-tty -- \
   cat /sandbox/.openclaw/openclaw.json 2>/dev/null \
   | python3 -c "import sys,json; print(json.load(sys.stdin).get('gateway',{}).get('auth',{}).get('token',''))")
 test -n "$TOKEN" && echo "token acquired"
+----
+
+Expected result: `token acquired`.
+
+Build the browser URL from the dashboard Route:
+
+[source,bash,role="execute",subs="attributes+"]
+----
 DASHBOARD_URL="https://$(oc get route {saw_gateway_name}-dashboard \
   -n {saw_namespace} -o jsonpath='{.spec.host}')/#token=$TOKEN"
 echo "$DASHBOARD_URL"
 ----
 
-Open the printed URL in a browser. The UI authenticates from the `#token=`
+Expected result: the token-bearing URL prints. Open it in a browser. The UI
+authenticates from the `#token=`
 fragment and lands in the chat session. Verify `Gateway status: Online` in
 the sidebar, then interact with the agent: use one of the suggested prompts
 (for example `Check system health`) or type your own request, and watch the
 assistant work with live tool activity. The prompts and session controls in
 the sidebar are the same object model you inspected through the CLI —
 sessions, devices, and gateway health are one system seen from two surfaces.
+This is the surface to show a customer: the agent working in a governed
+sandbox with tool activity visible, next to the CLI evidence that proves the
+boundary.
 
 Before trusting the UI, validate the two controls that gate it. First, the
 origin allowlist: the gateway only serves the Control UI to the browser

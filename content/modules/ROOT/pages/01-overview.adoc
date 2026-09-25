@@ -4,8 +4,10 @@
 == Control questions
 
 An agent that can read files, call APIs, install packages, or change systems
-has a larger blast radius than a chat application. The workshop evaluates four
-questions:
+has a larger blast radius than a chat application. These are the same four
+questions customers ask before allowing agents on their platform, and a
+recommendation has to answer each one with evidence rather than assertion. The
+workshop evaluates:
 
 * *Where does the agent run?*
 * *What can it reach?*
@@ -20,7 +22,8 @@ questions:
 
 | Platform
 | One multinode OpenShift {ocp_version} cluster
-| The harness provides the raw OpenShell evaluation path. Secure Agent Workspace
+| The harness provides the evaluation path on plain pods (the raw track).
+  Secure Agent Workspace
   provides the cluster-resident NemoClaw/OpenClaw path inside a per-user VM.
 
 | Sandbox control plane
@@ -49,7 +52,8 @@ questions:
 
 Two components to understand and be able to explain are:
 
-* The *OpenShell gateway* is the platform control plane. The raw track reaches
+* The *OpenShell gateway* is the platform control plane. The raw track — the
+  workshop's name for the evaluation path on plain pods, no VM layer — reaches
   the harness gateway through a local port-forward; the SAW track reaches a
   per-user gateway VM through an OIDC-authenticated Route.
 * The *OpenClaw gateway* is the agent's own control UI and WebSocket service,
@@ -57,7 +61,10 @@ Two components to understand and be able to explain are:
   lifecycle, and the fork's Make targets provide local dashboard forwarding.
 
 The command `openshell sandbox exec` crosses the OpenShell boundary. The
-command `openclaw` operates the agent once you are inside that boundary.
+command `openclaw` operates the agent once you are inside that boundary. Two
+live surfaces make the distinction visible: Module 2 runs the OpenShell TUI in
+a second terminal, and Module 5 drives the browser Control UI alongside CLI
+evidence.
 
 == Workshop progression
 
@@ -69,8 +76,8 @@ resources that represent it.
 === 2. Containment
 
 Inspect the effective policy, run allowed and denied operations, and correlate
-each result with gateway evidence. The raw harness is an evaluation boundary,
-not the SAW VM-isolated deployment.
+each result with gateway evidence. The raw-track harness is an evaluation
+boundary, not the SAW VM-isolated deployment.
 
 === 3. Usefulness
 
@@ -97,8 +104,8 @@ kernel boundary when the corresponding runtime control is active. It does not
 guarantee that a model produces correct requests. Verify policy, runtime events,
 and the observed result before making an enforcement claim.
 
-Pod and VM isolation are layered deployment choices. The raw path exposes the
-OpenShell controls directly. The SAW path places the gateway and agent inside a
+Pod and VM isolation are layered deployment choices. The pod-based path exposes
+the OpenShell controls directly. The SAW path places the gateway and agent inside a
 dedicated VM for the configured owner and adds identity, secret delivery, and
 GitOps-managed configuration.
 
