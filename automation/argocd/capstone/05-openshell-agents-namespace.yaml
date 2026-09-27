@@ -1,0 +1,22 @@
+# Module 7 prerequisite: the openshell-agents namespace, created as a REGULAR
+# wave-0 resource (NOT a hook — a hook Namespace would be deleted and
+# recreated on every sync, which would tear down the telemetry proxy, the
+# incident console, and later the fleet sandboxes with it). Without this the
+# PreSync mirror hooks (55/56) fail on a fresh cluster — the namespace only
+# exists on the fleet path after `make copy-images` — and the sync aborts
+# before any wave applies. Parity: the SAW fork's values-prod declares the
+# same namespace, so the two paths coexist; apps/10-capstone.yaml ignores
+# annotation and label diffs on it (the SAW chart injects managed-by and
+# pod-security labels, controllers inject SCC annotations).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshell-agents
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/managed-by: openshift-gitops
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: baseline
+    pod-security.kubernetes.io/warn-version: latest
+    argocd.argoproj.io/sync-wave: "0"

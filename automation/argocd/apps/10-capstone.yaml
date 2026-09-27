@@ -59,6 +59,16 @@ spec:
       kind: Namespace
       name: redhat-ods-operator
       jsonPointers: ["/metadata/annotations"]
+    # openshell-agents is declared in parity with the SAW fork's values-prod
+    # (see capstone/05-openshell-agents-namespace.yaml): the workshop creates
+    # it at wave 0 so the PreSync mirror hooks succeed on a fresh cluster,
+    # the SAW pattern adopts it identically. The SAW chart injects
+    # managed-by/pod-security labels and controllers inject SCC annotations
+    # — ignore both to avoid churn between the two self-healing managers.
+    - group: ""
+      kind: Namespace
+      name: openshell-agents
+      jsonPointers: ["/metadata/annotations", "/metadata/labels"]
   syncPolicy:
     automated:
       prune: true
