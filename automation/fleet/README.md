@@ -45,7 +45,7 @@ and keep it off shared hosts.
 
 ```bash
 ./fleet-install.sh                       # sequential, apply-and-move-on
-./fleet-install.sh --jobs 5              # 5 parallel workers → 50 clusters ≈ 2-3h
+./fleet-install.sh --jobs 5              # 5 parallel workers
 ./fleet-install.sh --wait                # block per cluster until the setup Job completes
 ./fleet-install.sh --no-emulation        # KVM-capable clusters only
 ./fleet-install.sh --dry-run             # print the plan, change nothing
@@ -56,9 +56,24 @@ Per cluster the script runs the fork's documented steps, in order:
 annotate (idempotent; skipped with `--no-emulation`) → optional setup-Job
 wait. After the install returns, VM setup continues in-cluster for ~1-3h.
 
-Parallel workers (`--jobs`) each clone the fork into `.workers/` — the
+Observed per-cluster wall time: `copy-images` ~10-15 min + the pattern
+GitOps health loop ~30-50 min → roughly 50-70 min per cluster. For a
+50-cluster order: sequential ≈ 2 days — use `--jobs`: 5 workers ≈ 10h,
+10 workers ≈ 5h. Each worker takes a stride through `clusters.csv`, so
+clusters never overlap and never install twice.
+
+Parallel workers each clone the fork into `.workers/` — the
 Validated Patterns framework writes state in the checkout, so one clone
-cannot serve two clusters at once.
+cannot serve two clusters at once. Each worker also gets its own
+kubeconfig (`~/.saw-fleet/worker-N.kubeconfig`): `oc login` flips the
+current context in a shared kubeconfig, so concurrent installs sharing
+one would send each other's helm calls at the wrong cluster. The caller's
+own login is never modified.
+
+**Before `--jobs > 1`: commit and push local fork changes.** Worker clones
+come from the fork repository, so uncommitted local fixes (e.g. the
+Apple-Silicon `pattern.sh` platform fix) are missing from them and the
+install breaks on arm64 hosts.
 
 ## Status
 

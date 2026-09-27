@@ -39,6 +39,7 @@ SAW_REF="${SAW_REF:-saw-emulation-fixes}"
 SAW_GITOPS_NS="${SAW_GITOPS_NS:-openshift-gitops}"
 SAW_NS="${SAW_NS:-openshell-agents}"
 SETUP_JOB="${SETUP_JOB:-openshell-saw-setup}"
+FLEET_KC_DIR="${FLEET_KC_DIR:-$HOME/.saw-fleet}"
 
 JOBS=1
 WAIT=0
@@ -127,11 +128,19 @@ install_cluster() {
     return 0
   fi
   local dir; dir="$(worker_dir "$worker")"
+  # Per-worker kubeconfig: parallel workers must not share ~/.kube/config —
+  # `oc login` flips the current context, so two concurrent installs would
+  # send each other's helm/oc calls at the wrong cluster. A dedicated file
+  # per worker (under HOME, so pattern.sh's bind mount reaches it) isolates
+  # each install and leaves the caller's own login untouched.
+  local kc; kc="$FLEET_KC_DIR/worker-$worker.kubeconfig"
+  mkdir -p "$FLEET_KC_DIR"
   if [[ -n "${token:-}" ]]; then
-    oc login "$server" --token="$token" --insecure-skip-tls-verify >/dev/null
+    oc login "$server" --token="$token" --kubeconfig="$kc" --insecure-skip-tls-verify >/dev/null
   else
-    oc login "$server" --username="$user" --password="$password" --insecure-skip-tls-verify >/dev/null
+    oc login "$server" --username="$user" --password="$password" --kubeconfig="$kc" --insecure-skip-tls-verify >/dev/null
   fi
+  export KUBECONFIG="$kc"
   echo "  [$name] Logged in"
   echo "  [$name] Mirroring quickstart images (in-cluster Skopeo)..."
   (cd "$dir" && make copy-images) >/dev/null
