@@ -12,6 +12,8 @@
 * xref:07-module-05-interact-with-agent.adoc[Module 5: Test Agent Capabilities]
 * xref:08-module-06-secure-agent-workspace.adoc[Module 6: Secure Agent Workspace]
 * xref:09-module-07-sre-capstone.adoc[Module 7: SRE Copilot Capstone]
+
+.Guardrails Finale
 * xref:13-module-08-model-boundary-guardrails.adoc[Module 8: Model-Boundary Guardrails]
 
 .Wrap-up

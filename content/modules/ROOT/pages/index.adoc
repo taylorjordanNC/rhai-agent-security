@@ -55,17 +55,18 @@ xref:14-facilitator-guide.adoc[Facilitator Guide].
 
 == Choose your track by allotted time
 
-The navigation groups the modules into two tracks. Pick by the time you have:
+The navigation groups the modules into two tracks plus a closing finale. Pick by the time you have:
 
 * *Core track — about 2 hours in class*: Modules 1, 2, and 4. Deploy the
   gateway, prove policy enforcement on the pod boundary, then validate the
-  SAW environment and drive the agent. Module 3 (90–150 min) is prework done
+  SAW environment and drive the agent, and finish at the Guardrails Finale
+  (Module 8). Module 3 (90–150 min) is prework done
   before class — or skip it when the facilitator deploys SAW with the fleet
   install script; either way, SAW is up before class.
-* *Extended track — everything, about 5 hours total*: adds Modules 5, 6, 7,
-  and 8 to the core — you set up everything yourself,
+* *Extended track — everything, about 5 hours total*: adds Modules 5, 6, and
+  7 to the core — you set up everything yourself,
   including Module 3. The complete OpenShell → OpenClaw → SAW experience plus
-  the model-boundary layer and the fleet capstone.
+  the fleet capstone — both tracks finish at the same Guardrails Finale.
 
 Dependencies, so you can enter where your time allows:
 
@@ -77,7 +78,7 @@ Dependencies, so you can enter where your time allows:
   only — the raw OpenShell modules (1-2) are not a prerequisite, so
   time-constrained participants can jump straight to it.
 * Module 8 (guardrails) is fully standalone — it needs only the OpenShift AI
-  foundation and an API key.
+  foundation and an API key — and closes both tracks.
 
 == Workshop map
 
