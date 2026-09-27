@@ -1,6 +1,8 @@
 = Security CTF
 :navtitle: Security CTF
 
+Parked — not part of the workshop; not rendered by Antora. Revive by re-registering this page in modules/ROOT/nav.adoc.
+
 This extended-track module turns the Module 2 control layers into timed challenges.
 Work from the raw OpenShell sandbox environment: the `{raw_gateway_name}`
 gateway and the
@@ -101,4 +103,4 @@ must assemble the proof themselves. A participant who completes all five
 challenges has demonstrated every raw OpenShell control layer without the
 module walkthroughs.
 
-When finished, continue to xref:11-cleanup.adoc[Cleanup].
+When finished, continue to Cleanup.

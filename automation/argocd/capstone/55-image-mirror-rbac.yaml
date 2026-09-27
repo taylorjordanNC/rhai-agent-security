@@ -35,6 +35,27 @@ subjects:
 - kind: ServiceAccount
   name: image-mirror
 ---
+# GitOps-compatible SCC grant: a Role with the `use` verb on the named SCC +
+# a standard RoleBinding. An SCC-roleRef RoleBinding is valid on OpenShift,
+# but Argo's RBAC validation (kubectl auth reconcile) rejects that
+# roleRef kind — this form validates and reconciles cleanly.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: image-mirror-use-nonroot-scc
+  namespace: openshell-agents
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "0"
+rules:
+- apiGroups: ["security.openshift.io"]
+  resources: ["securitycontextconstraints"]
+  resourceNames: ["nonroot"]
+  verbs: ["use"]
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -47,9 +68,9 @@ metadata:
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
     argocd.argoproj.io/sync-wave: "0"
 roleRef:
-  apiGroup: security.openshift.io
-  kind: SecurityContextConstraints
-  name: nonroot
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: image-mirror-use-nonroot-scc
 subjects:
 - kind: ServiceAccount
   name: image-mirror

@@ -21,7 +21,7 @@ workflow, and is not used by this workshop. The SAW integration installs a
 BOM-configured NemoClaw runtime in the VM and provisions its sandboxes through the
 OpenShell gateway.
 
-== Required for the raw OpenShell sandbox environment (Modules 1, 2, and the Security CTF)
+== Required for the raw OpenShell sandbox environment (Modules 1 and 2)
 
 Requirements provided by facilitators:
 
@@ -207,7 +207,7 @@ procedure creates its own SAW checkout — use that one.
 | Where | Modules | Why
 
 | `rhai-agent-security` repository root
-| Prerequisites, 1, 2, Security CTF, 8
+| Prerequisites, 1, 2, 8
 | The raw OpenShell sandbox environment automation, policy files, the
   guardrails chart, and the
   teardown live in this checkout.
