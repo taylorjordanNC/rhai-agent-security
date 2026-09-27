@@ -1,7 +1,7 @@
-= Optional: Security CTF
-:navtitle: Optional: Security CTF
+= Security CTF
+:navtitle: Security CTF
 
-This optional module turns the Module 2 control layers into timed challenges.
+This extended-track module turns the Module 2 control layers into timed challenges.
 Work from the raw track: the `{raw_gateway_name}` gateway and the
 `{raw_sandbox_name}` sandbox from Modules 1-2, with the quickstart policy
 applied. Each challenge states a goal; you produce the evidence that proves the
@@ -58,7 +58,9 @@ Evidence:
 
 * the allowed write;
 * two denied writes;
-* the runtime events or Landlock evidence distinguishing the denial source.
+* the failing command output and the world-writable (mode 1777) path
+  comparison that attribute the denials to Landlock rather than ordinary
+  Unix permissions.
 
 == Challenge 4: API abuse (L7 method control)
 

@@ -53,7 +53,6 @@ and DataVolumes:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-cd "$HOME/git/{saw_repo_dir}"
 oc get vm,dv -A
 ----
 
@@ -64,13 +63,12 @@ dedicated cluster with no unrelated virtualization workloads.
 include::secure-agent-workspace:ROOT:partial$deployment/cleanup.adoc[]
 
 After cluster cleanup, decide whether to retain or securely delete
-`$HOME/values-secret.yaml` and `$HOME/.generated-ssh-keys`. Remove the local SAW
-gateway registration and cached OIDC state according to the control node's
-credential-retention policy:
+`$HOME/values-secret.yaml` and `$HOME/.generated-ssh-keys`. Then change to the
+SAW checkout root and remove the local SAW gateway registration and cached
+OIDC state according to the control node's credential-retention policy:
 
 [source,bash,subs="attributes+"]
 ----
 openshell gateway remove {saw_gateway_name} 2>/dev/null || true
-cd "$HOME/git/{saw_repo_dir}"
 make logout
 ----

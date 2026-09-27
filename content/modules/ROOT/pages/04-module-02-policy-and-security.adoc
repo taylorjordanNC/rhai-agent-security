@@ -483,8 +483,10 @@ Run the positive control. A write inside the allowlist must succeed:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+POSITIVE_CONTROL=false
+LANDLOCK_DENIED=false
 openshell --gateway {raw_gateway_name} sandbox exec -n landlock-proof -- \
-  sh -c 'touch /tmp/allowed && rm /tmp/allowed'
+  sh -c 'touch /tmp/allowed && rm /tmp/allowed' && POSITIVE_CONTROL=true
 ----
 
 Expected result: the command succeeds. This proves the sandbox can write
@@ -495,7 +497,7 @@ Run the negative control. A write outside the allowlist must fail:
 [source,bash,role="execute",subs="attributes+"]
 ----
 openshell --gateway {raw_gateway_name} sandbox exec -n landlock-proof -- \
-  touch /var/tmp/openshell-workshop-probe
+  touch /var/tmp/openshell-workshop-probe || LANDLOCK_DENIED=true
 ----
 
 Expected result: the command fails with a permission error — Landlock denied
@@ -542,7 +544,7 @@ check must report the unprivileged `sandbox` user. The script exits non-zero
 when any control produced unexpected evidence — read the failing line to see
 which control layer disagreed with the expected result.
 
-== Exercise: Act as the platform admin
+== Exercise 6: Act as the platform admin
 
 The exercises so far viewed evidence from inside one sandbox. Act as the
 platform admin and inspect what the gateway recorded across the environment.
@@ -551,7 +553,7 @@ Sandbox API is cluster-scoped:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-oc -n {openshell_namespace} get sandboxes -A
+oc get sandboxes -A
 oc -n {openshell_namespace} logs statefulset/openshell --tail=500 | \
   grep -oE 'openshell\.[A-Za-z0-9.]+/[A-Za-z]+' | sort | uniq -c | sort -rn
 ----
@@ -605,8 +607,8 @@ The proof sequence is:
    the tested path boundary.
 . The automated control-layer test exits zero with every control in the
     expected state.
-+. Acting as platform admin, the cluster-wide sandbox list and the gateway RPC
-+   summary show what every sandbox attempted against the gateway.
+. Acting as platform admin, the cluster-wide sandbox list and the gateway RPC
+   summary show what every sandbox attempted against the gateway.
 
 .Answer key
 [%collapsible]

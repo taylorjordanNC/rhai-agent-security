@@ -70,7 +70,7 @@
   infer automated multi-user provisioning from one deployed release.
 
 | Human approval
-| The optional incident flow requires a UI confirmation before its fixed
+| The capstone incident flow requires a UI confirmation before its fixed
   remediation action.
 | Do not describe that confirmation as durable, identity-bound approval evidence
   unless the environment records and retains such an event.

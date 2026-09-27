@@ -8,7 +8,7 @@ platform admin's day-2 checklist — the same steps to run when you inherit or
 demo an environment.
 
 This is the required entry point for SAW exercises. Use it after completing the
-optional installation module or against a facilitator-provisioned environment.
+Module 3 prework or against a facilitator-provisioned environment.
 You will configure OIDC access, validate the deployed resources, inspect failure
 signals, and run OpenClaw through the SAW-managed NemoClaw sandbox.
 
@@ -55,7 +55,8 @@ production-shaped VM boundary with the runtime, OIDC, and secrets around it.
 
 The facilitator must provide these items for a pre-provisioned environment:
 
-* the SAW checkout at `$HOME/git/{saw_repo_dir}`;
+* the SAW checkout on the control node — if the facilitator has not provided
+  it, clone it: `git clone --branch {saw_repo_branch} {saw_repo_url}`;
 * an OIDC account whose subject a platform admin has added to the assigned
   workspace with `workspace member add` (the setup Job does not grant
   human-identity membership — see Exercise 1);
@@ -65,7 +66,7 @@ The facilitator must provide these items for a pre-provisioned environment:
 
 The SAW BOM and setup Job configure the agent image, inference routing,
 Vault-backed credentials, policy profiles, and sandbox lifecycle. Run all
-commands from `$HOME/git/{saw_repo_dir}` on the control node — the machine
+commands from the SAW checkout root on the control node — the machine
 holding the SAW SSH key and `virtctl`. A RHEL 10 or Fedora bastion is the
 supported control node; a macOS workstation with the same tools also works,
 and Windows participants use the validated WSL2 path. Nothing in this module
@@ -120,7 +121,8 @@ Replace SUBJECT with the `Subject:` value from `make whoami`. When
 `member add` commands, then return to the `developer` identity with
 `make login OIDC_FLOW=browser`. In a facilitator-provisioned environment the
 facilitator performs this member add for each participant subject before the
-workshop starts.
+workshop starts — if the first workspace-scoped CLI call succeeds, your
+subject is already a member and you can skip these commands.
 
 == Exercise 2: Validate the deployed workspace
 
@@ -220,11 +222,11 @@ Expected result: the OpenClaw TUI opens in the terminal, connected to the
 agent inside the sandbox. This is the user surface — type a prompt here and
 the agent works in its permitted workspace.
 
-Confirm the sandbox and its policy from a second terminal:
+Confirm the sandbox and its policy from a second terminal at the SAW checkout
+root:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-cd "$HOME/git/{saw_repo_dir}"
 openshell gateway select {saw_gateway_name}
 ----
 

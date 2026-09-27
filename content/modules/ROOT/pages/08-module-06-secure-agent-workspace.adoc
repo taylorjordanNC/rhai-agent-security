@@ -77,7 +77,7 @@ still decides what the agent can do inside it.
 
 | Governance | Sandbox policy and gateway audit | Git-reviewed profiles and fail-closed checks on configured interceptor RPC bindings
 
-| Access | Local port-forward | TLS dashboard Route with token-protected Control UI, forwarded by the gateway's authenticated ssh-proxy; local tunnel for non-forwarded sandboxes
+| Access | Local port-forward | TLS dashboard Route with token-protected Control UI, forwarded into the sandbox by the setup job's authenticated forward (the systemd unit using the gateway's native `openshell forward` RPC); local tunnel for non-forwarded sandboxes
 |===
 
 The evaluation path and SAW are intentionally different deployment layers.
@@ -101,11 +101,10 @@ Keep these responsibilities distinct while diagnosing the environment:
 == Exercise 1: Inspect VM and reconciliation state
 
 Map the running VM and setup Job to their Argo CD-managed applications. Start
-from the SAW checkout on the control node, then inspect the workload view:
+from the SAW checkout root on the control node, then inspect the workload view:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-cd "$HOME/git/{saw_repo_dir}"
 oc -n {saw_namespace} get vm,vmi,dv,job,pods,route
 ----
 
@@ -253,5 +252,8 @@ These artifacts identify control ownership. They do not establish unified audit,
 image attestation, secret rotation, or multi-user isolation unless those
 behaviors are separately exercised.
 
-Continue to the operational capstone in
-xref:09-module-07-sre-capstone.adoc[Module 7: SRE Copilot Capstone].
+Next, complete the model-boundary layer in
+xref:13-module-08-model-boundary-guardrails.adoc[Module 8: Model-Boundary
+Guardrails], or run the
+xref:09-module-07-sre-capstone.adoc[Module 7: SRE Copilot Capstone] when the
+fleet extension is provisioned.

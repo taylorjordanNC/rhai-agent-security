@@ -1,9 +1,10 @@
-= Module 3 (Optional): Install Secure Agent Workspace
-:navtitle: Optional SAW Installation
+= Module 3: Prework — Install Secure Agent Workspace
+:navtitle: SAW Prework
 
-This optional module installs Secure Agent Workspace (SAW) on the OpenShift
-cluster. Skip it when the facilitator provides an existing SAW environment and
-continue with xref:06-module-04-create-openclaw-agent.adoc[Module 4].
+This prework module installs Secure Agent Workspace (SAW) on the OpenShift
+cluster. Do it before class — or skip it entirely when the facilitator
+provides an existing SAW environment and continue with
+xref:06-module-04-create-openclaw-agent.adoc[Module 4].
 
 include::secure-agent-workspace:ROOT:partial$deployment/scope.adoc[]
 

@@ -18,7 +18,7 @@ governance rejection, and drive the agent from the browser Control UI.
 Agent output is not enforcement evidence. Validate each result from outside the
 agent by inspecting the workspace, effective policy, and gateway events.
 
-Run the commands from `{saw_repo_dir}` against the gateway configured
+Run the commands from the SAW checkout root against the gateway configured
 in Module 4.
 
 == Exercise 1: Verify the permitted workspace action
@@ -89,7 +89,9 @@ event. The failing `touch` itself is the evidence.
 
 == Exercise 3: Inspect managed capabilities
 
-Inspect the governance profiles vended by the interceptor:
+Inspect the governance profiles vended by the interceptor. The authenticated
+profile-list operation proves authenticated reads of the governance data work
+for your identity:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -100,13 +102,6 @@ openshell --gateway "$OPENSHELL_SAW_NAME" provider list-profiles
 The workshop checkout is read-only and the GitHub profile is already present, so
 do not run a helper that commits and pushes profile changes. Persistent changes
 require a writable fork tracked by Argo CD and a reviewed pull request.
-
-Verify that the authenticated profile-list operation succeeds:
-
-[source,bash,role="execute",subs="attributes+"]
-----
-openshell --gateway "$OPENSHELL_SAW_NAME" provider list-profiles
-----
 
 Expected result: the workshop's GitHub profile is listed — authenticated reads
 of the governance data work for your identity.
@@ -263,7 +258,8 @@ Collect:
 
 * the effective filesystem policy;
 * the permitted workspace file;
-* the denied-path result and corresponding runtime event;
+* the denied-path result — the failing `touch` plus the world-writable-path
+  comparison that attributes the denial to Landlock;
 * the successful profile listing followed by the rejected provider creation;
 * the Control UI showing `Gateway status: Online` with a completed agent
   interaction; and
@@ -277,8 +273,10 @@ Collect:
   writable and paths outside it are not declared.
 * The permitted workspace file exists and is non-empty (`test -s
   /sandbox/haiku.txt`).
-* The denied-path write fails and the runtime event names the path and denial
-  source; a Unix permission or SELinux denial is not equivalent evidence.
+* The denied-path write fails with a permission error. Landlock denials are
+  kernel-silent — no runtime event exists for filesystem denials — so the
+  evidence is the failing command plus the world-writable (mode 1777) path
+  comparison; a Unix permission or SELinux denial is not equivalent evidence.
 * The profile listing succeeds for the authenticated identity while the
   unvended `custom` provider creation is rejected by the governance
   interceptor (fail-closed).

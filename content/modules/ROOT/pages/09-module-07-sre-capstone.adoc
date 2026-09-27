@@ -1,10 +1,14 @@
 = Module 7: SRE Copilot Capstone
 :navtitle: SRE Copilot Capstone
 
-This optional extension runs a three-agent observability fleet against the
+The capstone extension runs a three-agent observability fleet against the
 deployed Secure Agent Workspace. Participants verify governance-signed
 per-agent access, investigate live telemetry, drive a real outage in the
 browser, and confirm the remediation as a human.
+
+Prerequisites: SAW up and Module 4's client configuration only — the
+raw-track modules (1-2) are not a prerequisite, so time-constrained
+participants can jump straight here.
 
 == Why this matters
 
@@ -86,16 +90,20 @@ Gauge, Trace, Probe, Sage), scaled to three agents for this environment.
 
 == Extension prerequisites
 
-The capstone environment is **Argo-managed from this repository**:
-`automation/sre-capstone/` holds the Application that brings the demo shop,
-the MLflow instance, the telemetry proxy, the incident console, and the
-planted incident data up with the cluster's GitOps. The facilitator
-bootstraps it once, after the SAW deployment (module 6) is up:
+The capstone environment is **Argo-managed from this repository** (the
+`rhai-agent-security` repository root): the workshop root app-of-apps
+(`{gitops_root}/`) brings the demo shop, the MLflow instance, the
+telemetry proxy, the incident console, and the planted incident data up as
+the `module-7-prereqs` child in the cluster's `{gitops_namespace}` instance.
+On GitOps-provisioned clusters (RHDP orders) the root is already applied;
+otherwise the facilitator applies it once — before or after the SAW
+deployment, since the child holds in retry until SAW (module 6) and the
+MLflow operator are healthy:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
 make -C automation capstone-bootstrap
-oc get application module-7-prereqs -n vp-gitops   # Synced, then Healthy
+oc get application module-7-prereqs -n {gitops_namespace}   # Synced, then Healthy
 ----
 
 The PostSync seed job plants the agent-session traces of a *prior* incident
@@ -109,7 +117,14 @@ and re-plants idempotently on each sync. What stays with the facilitator:
   xref:attachment$plant-incident-traces.sh[plant-incident-traces.sh] run on
   the workspace VM stages `/tmp/incident-search.json`,
   `/tmp/mlflow.token` and `/tmp/agent-session-trace.json` inside the
-  `traces` sandbox (idempotent — it also refreshes the planted story).
+  `traces` sandbox (idempotent — it also refreshes the planted story), and
+  stages `$SA_TOKEN`, a read-only service account token, in the `metrics`
+  sandbox environment.
+
+The fleet sandboxes are provisioned in the gateway's default workspace, so
+the exec commands below omit `--workspace`. If your BOM provisions them in
+`{saw_workspace}`, add `--workspace {saw_workspace}` to each command and set
+`WORKSPACE={saw_workspace}` for the GUI tunnel in Exercise 3.
 
 Resolve the MLflow experiment id once and keep it in your VM shell — every
 MLflow request needs it:
@@ -189,7 +204,7 @@ reach them:
 
 * *Control UI (browser)* — the dashboard Route forwards only `{saw_sandbox}`;
   the fleet sandboxes use the shipped tunnel, as in Module 5. From
-  `$HOME/git/{saw_repo_dir}`:
+  the SAW checkout root:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -379,4 +394,5 @@ When the extension is complete, use the console to restore the shop and
 the incident UI to remove the demo application. The facilitator removes
 the fleet sandboxes with their owning automation.
 
-Proceed to xref:11-cleanup.adoc[Cleanup].
+Continue to xref:13-module-08-model-boundary-guardrails.adoc[Module 8:
+Model-Boundary Guardrails] to complete the model-boundary layer.
