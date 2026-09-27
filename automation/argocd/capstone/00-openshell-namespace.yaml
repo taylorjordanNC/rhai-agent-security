@@ -2,7 +2,7 @@
 # the SAW-managed agent fleet) run in. Sync wave 0 — created before everything
 # else in this Application so the GitOps-first path (RHDP order / root
 # app-of-apps applied before the module 1 exercises run) does not depend on
-# the raw-track harness creating the namespace.
+# the raw OpenShell environment creating the namespace.
 # The mlflow-workspace label lets MLflow's workspace store resolve the
 # namespace by that label (see the module-7-prereqs prerequisites).
 # Note: on a GitOps-managed cluster, removing this Application (or the root)

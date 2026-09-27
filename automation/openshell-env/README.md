@@ -287,7 +287,7 @@ Every outbound connection goes through OpenShell's HTTP CONNECT proxy. Only endp
 
 ```bash
 # Apply the workshop policy to the Module 1 sandbox
-openshell policy set policy-lab --policy ../../policies/sandbox-policy-quickstart.yaml --wait
+openshell policy set policy-lab --policy ../policies/sandbox-policy-quickstart.yaml --wait
 
 # From inside the sandbox:
 curl https://api.github.com/zen   # -> HTTP 200 (allowed host, read-only)

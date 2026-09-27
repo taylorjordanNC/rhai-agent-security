@@ -2,7 +2,8 @@
 
 `root.yaml` is the workshop's root app-of-apps Application; `apps/` holds the
 child Applications it manages (currently `10-capstone.yaml`, the Module 7
-capstone prerequisites). The SAW deployment is deliberately *not* a child
+capstone prerequisites), and `capstone/` is the GitOps sync source that the
+capstone Application deploys. The SAW deployment is deliberately *not* a child
 here: it is the SAW fork's Validated Patterns deployment — scripted by
 `../fleet/` or run by participants in module 3.
 
@@ -44,14 +45,14 @@ structurally. If the SAW fork or its framework changes:
 |---|---|
 | Fork renames/moves `vp-gitops` | Update the `saw_gitops_namespace` attribute in both Antora `antora.yml` files (parity-checked by `npm run validate:docs`) and `SAW_GITOPS_NS` in `../fleet/` |
 | Fork changes `pattern.sh`/install procedure | Update the per-cluster function in `../fleet/fleet-install.sh` (it calls the fork's entry points verbatim) |
-| Fork charts change runtime namespaces | Update the namespace references in `../sre-capstone/components/` (the wave-0 `openshell` Namespace, telemetry proxy, seed Job) |
+| Fork charts change runtime namespaces | Update the namespace references in `capstone/` (the wave-0 `openshell` Namespace, telemetry proxy, seed Job) |
 | Fork decays or the framework is abandoned | Plan B: rebuild SAW as Argo children pointing at the fork's charts (`charts/openshift-cnv`, `openshell-keycloak`, `pattern-secrets`, `governance-policy`, `governance-interceptor`, `saw-bom`, `openshell-saw` + `/overrides/openshell-saw.yaml`) plus Subscription glue (CNV `stable`, RHBK `stable-v26`, RHOAI `fast`). The charts are plain Helm; ~10 manifests. Not built until needed |
 
 ## Managed children
 
 | Child | Source path | Depends on |
 |---|---|---|
-| `module-7-prereqs` | `automation/sre-capstone/components` | SAW up (retry), RHOAI MLflow operator |
+| `module-7-prereqs` | `automation/argocd/capstone` | SAW up (retry), RHOAI MLflow operator |
 
 Add future children (e.g. the NeMo Guardrails chart) as Application manifests
 in `apps/` — the root's `directory.include: "*.yaml"` picks them up

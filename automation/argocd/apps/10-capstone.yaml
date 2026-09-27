@@ -7,7 +7,7 @@
 #
 #   oc apply -f automation/argocd/apps/10-capstone.yaml
 #
-# The Application watches this repository's automation/sre-capstone/components
+# The Application watches this repository's automation/argocd/capstone
 # directory. Sync waves order the components: openshell namespace (0), demo
 # shop (0), MLflow instance (1), telemetry proxy (2, needs openshell-agents
 # from the SAW deployment), incident console (3), seed RBAC (4). A PostSync
@@ -30,7 +30,7 @@ spec:
   source:
     repoURL: https://github.com/taylorjordanNC/rhai-agent-security.git
     targetRevision: main
-    path: automation/sre-capstone/components
+    path: automation/argocd/capstone
   destination:
     server: https://kubernetes.default.svc
     namespace: demo

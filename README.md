@@ -22,15 +22,22 @@ raw OpenShell pod boundary to the production-shaped Secure Agent Workspace VM:
    TrustyAI operator, prove rails block sensitive input before the model, wire
    a client application, and change a rail live.
 
-* `automation/` contains the raw OpenShell harness and pinned policies used by
-  the raw-track modules (1, 2, and the optional Security CTF), plus the
-  Argo-managed capstone prerequisites.
-* `automation/sre-capstone/` is the GitOps source for the Module 7 capstone
-  environment (demo shop, MLflow instance, telemetry proxy, incident console,
-  and the incident-data seed job): `Application module-7-prereqs` in the
-  `vp-gitops` namespace points at `automation/sre-capstone/components` here.
-  Bootstrap with `make -C automation capstone-bootstrap` after the SAW
-  deployment is up.
+* `automation/` contains the raw OpenShell sandbox environment scripts and
+  pinned policies used by
+  the raw OpenShell modules (1, 2, and the optional Security CTF), the workshop
+  GitOps app-of-apps, and the fleet SAW deployment scripts.
+* `automation/argocd/` is the workshop's Argo CD entry point (app-of-apps):
+  `root.yaml` is the root Application and `apps/` holds the children it
+  manages — currently `module-7-prereqs`, the Module 7 capstone
+  prerequisites. Point the RHDP order's gitops path at `automation/argocd/apps`
+  or apply the root once with `make -C automation capstone-bootstrap`; the
+  capstone child retries until the SAW deployment and the RHOAI MLflow
+  operator are healthy. `automation/argocd/capstone/` holds the
+  capstone environment (demo shop, MLflow instance, telemetry proxy, incident
+  console, and the incident-data seed job).
+* `automation/fleet/` loops the SAW fork's documented install over ~50 RHDP
+  clusters (the **SAW as script** path); participants run the same procedure
+  manually in module 3.
 * `automation/charts/nemo-guardrails` is the Helm chart Module 8 installs: it
   deploys the guardrails server via the TrustyAI operator with a
   user-supplied model API key.
@@ -57,7 +64,7 @@ npm ci
 npm run build
 ```
 
-The workshop includes the harness raw OpenShell deployment and policy
+The workshop includes the raw OpenShell sandbox environment and policy
 quickstart. It consumes the SAW deployment procedure directly from the fork's
 Antora component so charts, scripts, and deployment commands are not copied into
 this repository. The SAW fork stays trim to the changes needed for the SAW

@@ -1,8 +1,7 @@
 SHELL := /usr/bin/env bash
 
 AUTOMATION_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
-HARNESS_DIR := $(AUTOMATION_DIR)/harness/01-basic-openshell
-CAPSTONE_DIR := $(AUTOMATION_DIR)/sre-capstone
+HARNESS_DIR := $(AUTOMATION_DIR)/openshell-env
 ARGOCD_DIR := $(AUTOMATION_DIR)/argocd
 FLEET_DIR := $(AUTOMATION_DIR)/fleet
 ROOT_APP ?= rhai-agent-security

@@ -9,9 +9,8 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-# shellcheck source=../../common/functions.sh
-source "$REPO_ROOT/common/functions.sh"
+# shellcheck source=functions.sh
+source "$SCRIPT_DIR/functions.sh"
 
 SANDBOX_NAME="${1:-policy-lab}"
 

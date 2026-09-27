@@ -1,8 +1,16 @@
 = Workshop Automation
 
-This directory contains the OpenShift OpenShell evaluation installer, the
-canonical policy used by the workshop, the workshop GitOps app-of-apps, and
-the fleet SAW deployment scripts.
+This directory contains the raw OpenShell sandbox environment installer, the
+canonical policy used by the workshop, the workshop GitOps app-of-apps (with
+the capstone manifests it deploys), and the fleet SAW deployment scripts.
+
+| Directory | What it holds
+| `openshell-env/` | raw OpenShell sandbox environment scripts: install, verify, teardown, and the sandbox security test
+| `policies/` | the pinned sandbox policies the workshop applies
+| `argocd/` | the workshop GitOps app-of-apps (`root.yaml`, `apps/`) and the capstone manifests it deploys (`capstone/`)
+| `fleet/` | multi-cluster SAW deployment scripts for RHDP orders
+| `bootstrap/` | local CLI install and the pre-flight check
+| `charts/` | the Helm charts modules install (currently `nemo-guardrails`)
 
 Secure Agent Workspace deployment assets are not copied into this directory.
 Follow the workshop instructions from the `saw-emulation-fixes` branch of the
@@ -11,9 +19,10 @@ Follow the workshop instructions from the `saw-emulation-fixes` branch of the
 == Workshop GitOps (app-of-apps)
 
 `argocd/` is the workshop's Argo CD entry point: `argocd/root.yaml` is the
-root app-of-apps Application, and `argocd/apps/` holds the child Applications
+root app-of-apps Application, `argocd/apps/` holds the child Applications
 it manages (currently `module-7-prereqs`, the Module 7 capstone
-prerequisites). The SAW deployment is deliberately *not* a child here — it is
+prerequisites), and `argocd/capstone/` is the sync source those Applications
+deploy. The SAW deployment is deliberately *not* a child here — it is
 the SAW fork's Validated Patterns deployment (scripted by `fleet/` or run by
 participants in module 3).
 
@@ -84,8 +93,8 @@ make -C automation prerequisites
 
 == Raw OpenShell
 
-Install the harness-compatible evaluation gateway, then run the sandbox
-control-layer test after the Modules 1-2 exercises have created the
+Install the raw OpenShell evaluation gateway from `openshell-env/`, then run
+the sandbox control-layer test after the Modules 1-2 exercises have created the
 `policy-lab` sandbox and applied the quickstart policy:
 
 [source,bash]
@@ -94,7 +103,7 @@ make -C automation install-openshell
 make -C automation openshell-security-test
 ----
 
-This path intentionally uses the harness's plaintext, unauthenticated lab
+This path intentionally uses the environment's plaintext, unauthenticated lab
 configuration. It is not the production security posture.
 
 == NeMo Guardrails chart
@@ -137,12 +146,12 @@ content, and verification cannot drift:
 | `openshell_version`, `openshell_saw_version`, and `ocp_version` must agree
   with this repository; `npm run validate:docs` enforces the parity
 
-| `automation/harness/01-basic-openshell/verify.sh`
+| `automation/openshell-env/verify.sh`
 | The `OPENSHELL_VERSION` fallback default used when the script runs outside
   `make openshell-verify`
 
 | `automation/README.md` and
-  `automation/harness/01-basic-openshell/README.md`
+  `automation/openshell-env/README.md`
 | The pinned version named in the prerequisites text
 |===
 

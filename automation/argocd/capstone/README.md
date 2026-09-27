@@ -3,8 +3,8 @@
 The components module 7 (SRE Copilot Capstone) needs up **before workshop
 participants proceed** live here as Argo CD–managed manifests. This directory
 is the GitOps source for the `module-7-prereqs` child Application, managed by
-the workshop root app-of-apps (`../argocd/root.yaml`), which points at
-`automation/sre-capstone/components` on `taylorjordanNC/rhai-agent-security@main`
+the workshop root app-of-apps (`../root.yaml`), which points at
+`automation/argocd/capstone` on `taylorjordanNC/rhai-agent-security@main`
 in the cluster's `openshift-gitops` instance.
 
 | Component | Sync wave | Namespace | Purpose |
@@ -53,7 +53,7 @@ oc logs job/incident-data-seed -n openshell
 - **Sandbox hand-off files**: the module's exec commands read
   `/tmp/incident-search.json`, `/tmp/mlflow.token` and
   `/tmp/agent-session-trace.json` inside the `traces` sandbox. Stage them by
-  running `../../content/modules/ROOT/assets/attachments/plant-incident-traces.sh`
+   running `../../../content/modules/ROOT/assets/attachments/plant-incident-traces.sh`
   on the workspace VM (also linked from module 7's Extension prerequisites).
   The script is idempotent: it re-plants the story (matching the seed Job) and
   stages the files into the sandbox.

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Shared functions for agent-harness-in-a-box demos.
+# Shared functions for the raw OpenShell sandbox environment scripts.
 
 # Colors
 RED='\033[0;31m'

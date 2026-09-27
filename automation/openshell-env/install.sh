@@ -4,9 +4,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-# shellcheck source=../../common/functions.sh
-source "$REPO_ROOT/common/functions.sh"
+# shellcheck source=functions.sh
+source "$SCRIPT_DIR/functions.sh"
 
 NAMESPACE="${NAMESPACE:-openshell}"
 RAW_GATEWAY_NAME="${RAW_GATEWAY_NAME:-local-gateway}"
@@ -14,7 +13,7 @@ OPENSHELL_VERSION="${OPENSHELL_VERSION:-0.0.103}"
 OPENSHELL_SANDBOX_IMAGE="${OPENSHELL_SANDBOX_IMAGE:-ghcr.io/nvidia/openshell-community/sandboxes/base@sha256:aeef1c63f00e2913ea002ccb3aaf925f338b5c5d70e63576f0d95c16a138044e}"
 
 if [ "${ENABLE_TLS:-false}" = "true" ]; then
-    echo "ENABLE_TLS is not supported by this workshop harness. Use the documented local port-forward." >&2
+    echo "ENABLE_TLS is not supported by this workshop environment. Use the documented local port-forward." >&2
     exit 1
 fi
 
@@ -66,7 +65,7 @@ wait_for_rollout statefulset openshell "$NAMESPACE" 300
 # Step 7: In-cluster POST echo service used by the policy exercises
 deploy_http_echo "$NAMESPACE"
 
-# Remove the Route created by older harness revisions. This gateway is
+# Remove the Route created by older revisions of this environment. This gateway is
 # unauthenticated and must remain reachable only through port-forwarding.
 oc -n "$NAMESPACE" delete route openshell-gw 2>/dev/null || true
 echo ""
