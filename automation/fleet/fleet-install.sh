@@ -12,6 +12,9 @@
 #
 # Options:
 #   --csv FILE        credentials CSV (default: clusters.csv next to this script)
+#                     rows: name,server,username,password[,token] — an optional
+#                     5th token column logs in with a bearer token instead of
+#                     username/password (token takes precedence when present).
 #   --jobs N          parallel clusters (default 1). Parallel workers each get
 #                     their own fork clone — the framework writes state in the
 #                     checkout, so one clone cannot serve two clusters.
@@ -19,8 +22,7 @@
 #                     complete (default: apply-and-move-on; the VM setup runs
 #                     in-cluster for up to ~3h — poll with fleet-status.sh)
 #   --no-emulation    skip the HCO software-emulation step (KVM-capable clusters)
-#   --dry-run         print the per-cluster plan without logging in or installing
-#
+#   --dry-run         print the per-cluster plan without logging in or installing#
 # Shared one-time assets (created once, reused for every cluster):
 #   SAW_DIR   fork checkout   (default ~/git/secure-agent-workspace)
 #   SAW_REF   fork revision   (default saw-emulation-fixes)
@@ -34,7 +36,7 @@ CSV="${CSV:-$SCRIPT_DIR/clusters.csv}"
 SAW_DIR="${SAW_DIR:-$HOME/git/secure-agent-workspace}"
 SAW_REPO_URL="${SAW_REPO_URL:-https://github.com/taylorjordanNC/secure-agent-workspace.git}"
 SAW_REF="${SAW_REF:-saw-emulation-fixes}"
-SAW_GITOPS_NS="${SAW_GITOPS_NS:-vp-gitops}"
+SAW_GITOPS_NS="${SAW_GITOPS_NS:-openshift-gitops}"
 SAW_NS="${SAW_NS:-openshell-agents}"
 SETUP_JOB="${SETUP_JOB:-openshell-saw-setup}"
 
@@ -114,7 +116,7 @@ wait_for_setup_job() {
 }
 
 install_cluster() {
-  local name="$1" server="$2" user="$3" password="$4" worker="$5"
+  local name="$1" server="$2" user="$3" password="$4" token="$5" worker="$6"
   echo "[$name] $server"
   if [[ $DRY_RUN -eq 1 ]]; then
     echo "  [dry-run] oc login (redacted)"
@@ -125,7 +127,11 @@ install_cluster() {
     return 0
   fi
   local dir; dir="$(worker_dir "$worker")"
-  oc login "$server" --username="$user" --password="$password" --insecure-skip-tls-verify >/dev/null
+  if [[ -n "${token:-}" ]]; then
+    oc login "$server" --token="$token" --insecure-skip-tls-verify >/dev/null
+  else
+    oc login "$server" --username="$user" --password="$password" --insecure-skip-tls-verify >/dev/null
+  fi
   echo "  [$name] Logged in"
   echo "  [$name] Mirroring quickstart images (in-cluster Skopeo)..."
   (cd "$dir" && make copy-images) >/dev/null
@@ -156,8 +162,8 @@ echo "Fleet SAW install: ${#ROWS[@]} cluster(s), jobs=$JOBS, wait=$WAIT, emulati
 
 run_one() { # idx, row, worker number
   local idx="$1" row="$2" worker="$3"
-  IFS=, read -r name server user password <<<"$row"
-  install_cluster "$name" "$server" "$user" "$password" "$worker" || \
+  IFS=, read -r name server user password token <<<"$row"
+  install_cluster "$name" "$server" "$user" "$password" "${token:-}" "$worker" || \
     echo "  [$name] FAILED — see output above; the script is idempotent, re-run to retry" >&2
 }
 

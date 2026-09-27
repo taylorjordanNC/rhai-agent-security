@@ -7,6 +7,9 @@
 #
 #   --current   check only the current oc context (single-cluster check)
 #
+# CSV rows: name,server,username,password[,token] — an optional 5th token
+# column logs in with a bearer token instead of username/password.
+#
 # Environment overrides (single knobs for fork coupling):
 #   SAW_GITOPS_NS   namespace holding the SAW pattern Argo CD Applications (default vp-gitops)
 #   SAW_NS          SAW namespace (default openshell-agents)
@@ -15,7 +18,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CSV="${CSV:-$SCRIPT_DIR/clusters.csv}"
-SAW_GITOPS_NS="${SAW_GITOPS_NS:-vp-gitops}"
+SAW_GITOPS_NS="${SAW_GITOPS_NS:-openshift-gitops}"
 SAW_NS="${SAW_NS:-openshell-agents}"
 SETUP_JOB="${SETUP_JOB:-openshell-saw-setup}"
 CURRENT=0
@@ -69,8 +72,14 @@ done < "$CSV"
 [[ ${#ROWS[@]} -gt 0 ]] || { echo "No cluster rows in $CSV" >&2; exit 1; }
 
 for row in "${ROWS[@]}"; do
-  IFS=, read -r name server user password <<<"$row"
-  if oc login "$server" --username="$user" --password="$password" --insecure-skip-tls-verify >/dev/null 2>&1; then
+  IFS=, read -r name server user password token <<<"$row"
+  if [[ -n "${token:-}" ]]; then
+    LOGIN_OK=1
+    oc login "$server" --token="$token" --insecure-skip-tls-verify >/dev/null 2>&1 || LOGIN_OK=0
+  else
+    oc login "$server" --username="$user" --password="$password" --insecure-skip-tls-verify >/dev/null 2>&1 && LOGIN_OK=1 || LOGIN_OK=0
+  fi
+  if [[ $LOGIN_OK -eq 1 ]]; then
     check_one "$name"
   else
     printf '\n----- %s -----\n  login failed for %s\n' "$name" "$server"

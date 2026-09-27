@@ -76,9 +76,13 @@ and the workshop namespaces per cluster.
 |---|---|---|
 | `SAW_DIR` | `~/git/secure-agent-workspace` | fork checkout (sequential mode) |
 | `SAW_REF` | `saw-emulation-fixes` | fork revision (`--jobs` clones) |
-| `SAW_GITOPS_NS` | `vp-gitops` | SAW pattern Argo CD namespace (status) |
+| `SAW_GITOPS_NS` | `openshift-gitops` | SAW pattern Argo CD namespace (status) |
 | `SAW_NS` | `openshell-agents` | SAW namespace |
 | `CSV` | `clusters.csv` | credentials file |
+
+Credentials rows are `name,server,username,password[,token]` — an optional
+5th token column logs in with a bearer token instead of username/password
+(e.g. for SNOs that only expose tokens).
 
 If the SAW fork changes its Argo CD instance namespace, update `SAW_GITOPS_NS`
 here and the `saw_gitops_namespace` attribute in both Antora `antora.yml`
