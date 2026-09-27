@@ -12,6 +12,12 @@ metadata:
   labels:
     app.kubernetes.io/part-of: sre-copilot-capstone
     argocd.argoproj.io/sync-wave: "1"
+  # SkipDryRunOnMissingResource: the CRD is registered by the MLflow operator
+  # that the wave-0 DataScienceCluster (dsc.yaml) deploys — without this Argo
+  # rejects the whole sync while the CRD is still missing, which would abort
+  # the sync before the DataScienceCluster ever applies (deadlock).
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   artifactsDestination: file:///mlflow/artifacts
   backendStoreUri: sqlite:////mlflow/mlflow.db
