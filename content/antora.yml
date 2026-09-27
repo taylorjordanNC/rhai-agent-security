@@ -13,6 +13,8 @@ asciidoc:
     openshift_console_url: '%OPENSHIFT_CONSOLE_URL%'
     ocp_version: '4.22'
     automation_repo: 'automation'
+    gitops_namespace: 'openshift-gitops'
+    gitops_root: 'automation/argocd'
     saw_repo_url: 'https://github.com/taylorjordanNC/secure-agent-workspace.git'
     saw_repo_branch: 'saw-emulation-fixes'
     saw_repo_dir: 'secure-agent-workspace'

@@ -6,35 +6,37 @@ deployment supplies the raw OpenShell gateway and policy sandbox. Secure Agent
 Workspace (SAW) supplies the cluster-resident NemoClaw/OpenClaw runtime inside a
 per-user VM.
 
-The lab environment must provide a checkout of `rhai-agent-security` on the
-control node. Obtain its approved repository URL from the facilitator. Commands
+The local environment where you run commands from must have the `rhai-agent-security` repository available. Obtain its approved repository URL from the facilitator. Commands
 that reference `{automation_repo}` assume the terminal is at that checkout's
 repository root; verify `test -f {automation_repo}/Makefile` before starting.
 
-NemoClaw's standalone `nemoclaw onboard` workflow is a local container-runtime
-workflow and is not used by this workshop. The SAW integration installs a
+NemoClaw includes a standalone `nemoclaw onboard` workflow, a local container-runtime
+workflow, and is not used by this workshop. The SAW integration installs a
 BOM-configured NemoClaw runtime in the VM and provisions its sandboxes through the
 OpenShell gateway.
 
 == Required for the core workshop
 
-You need:
+Requirements provided by facilitators:
 
 * A multinode OpenShift {ocp_version} cluster.
 * Cluster-admin permission to install an OLM Subscription and cluster-scoped
   Agent Sandbox CRDs/RBAC, grant the privileged SCC to the sandbox service
   account, create the `openshell` namespace, and install a Helm release.
-* `oc` authenticated to the target cluster.
-* Helm 3.x, Git, `curl`, OpenSSL, `tar`, `install`, and standard Unix shell tools.
-* The OpenShell CLI matching the selected gateway. The harness baseline is
-  `{openshell_version}`; the SAW guest gateway is `{openshell_saw_version}`.
-  Do not mix client and gateway versions.
 * The Red Hat Agent Sandbox operator channel used by the harness,
   `{agent_sandbox_channel}`.
 * A default StorageClass. The OpenShell gateway stores its SQLite data in a
   1Gi PVC.
 * Cluster and registry egress sufficient to install Agent Sandbox, pull the
   Helm chart, and pull the sandbox image.
+
+Requirements that must be handled by the users:
+
+* `oc` authenticated to the target cluster.
+* Helm 3.x, Git, `curl`, OpenSSL, `tar`, `install`, and standard Unix shell tools.
+* The OpenShell CLI matching the selected gateway. The harness baseline is
+  `{openshell_version}`; the SAW guest gateway is `{openshell_saw_version}`.
+  Do not mix client and gateway versions.
 
 The raw policy track does not require a model API key. The SAW workspace needs
 an inference provider configured through Vault and External Secrets Operator.
@@ -50,8 +52,8 @@ The OpenClaw/NemoClaw exercises run in a SAW VM on the same cluster. You need:
 * The SAW checkout, generated SSH key, namespace read access, and assigned
   workspace details supplied by the facilitator.
 
-The core SAW exercises use a pre-provisioned workspace. The optional SAW
-installation module additionally requires:
+The core SAW exercises use a pre-provisioned workspace. The Module 3 prework
+(SAW installation) additionally requires:
 
 * Cluster-admin access and a dedicated workshop cluster.
 * At least 16 CPUs and 32 GiB of memory for software emulation, or nodes with
@@ -152,6 +154,55 @@ The OpenShell CLI must report `{openshell_version}`. The SAW guest gateway repor
 more specific `{openshell_saw_version}` build; that is the expected Red Hat SAW
 packaging suffix for the same compatibility line.
 
+== Get the workshop checkouts
+
+Two checkouts are needed, and the modules reference them by role, not by a
+fixed path — clone each to any location you prefer:
+
+Clone the workshop repository and change to its repository root. Obtain its
+approved repository URL from the facilitator:
+
+[source,bash,subs="attributes+"]
+----
+git clone <approved repository URL from the facilitator>
+cd rhai-agent-security
+----
+
+Clone the Secure Agent Workspace checkout — the SAW Make targets, SSH key, and
+tunnel script live there:
+
+[source,bash,subs="attributes+"]
+----
+git clone --branch {saw_repo_branch} {saw_repo_url}
+----
+
+Note the location of the `secure-agent-workspace` checkout: the SAW modules
+run from its root. A facilitator-provisioned environment may already provide
+both checkouts; if you complete the Module 3 prework, its deployment
+procedure creates its own SAW checkout — use that one.
+
+== Where each module runs from
+
+[cols="2,2,3",options="header"]
+|===
+| Where | Modules | Why
+
+| `rhai-agent-security` repository root
+| Prerequisites, 1, 2, Security CTF, 8
+| The harness automation, policy files, the guardrails chart, and the
+  teardown live in this checkout.
+
+| The SAW checkout root
+| 4, 5, 6, and the SAW steps of 7
+| The SAW Make targets (`openclaw-tui`, `openshell-saw-gui`), the SSH key,
+  and the tunnel script live in this checkout.
+
+| Both
+| 3 (SAW prework)
+| This repository drives the harness; the SAW fork's canonical partials drive
+  the deployment.
+|===
+
 == Verify the workshop automation and SAW fork
 
 Run the following commands from the `rhai-agent-security` repository root.
@@ -231,7 +282,7 @@ as a production secret store.
 | `{openshell_namespace}`
 
 | SAW deployment checkout
-| `$HOME/git/{saw_repo_dir}`
+| your `secure-agent-workspace` checkout (see xref:#_get_the_workshop_checkouts[Get the workshop checkouts])
 |===
 
 Proceed to xref:03-module-01-basic-openshell.adoc[Module 1: Basic OpenShell]

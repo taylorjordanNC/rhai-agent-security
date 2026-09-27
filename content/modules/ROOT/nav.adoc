@@ -1,14 +1,17 @@
 * xref:index.adoc[Introduction]
 * xref:01-overview.adoc[Architecture and Control Boundaries]
 * xref:02-details.adoc[Prerequisites and Environment]
+== Core track — about 2 hours in class
 * xref:03-module-01-basic-openshell.adoc[Module 1: Basic OpenShell]
 * xref:04-module-02-policy-and-security.adoc[Module 2: Policy and Security]
-* xref:05-module-03-deploy-secure-agent-workspace.adoc[Module 3: Optional SAW Installation]
+* xref:05-module-03-deploy-secure-agent-workspace.adoc[Module 3: Prework — Install SAW]
 * xref:06-module-04-create-openclaw-agent.adoc[Module 4: Validate and Operate SAW]
+== Extended track — about 5.5 hours total
 * xref:07-module-05-interact-with-agent.adoc[Module 5: Test Agent Capabilities]
 * xref:08-module-06-secure-agent-workspace.adoc[Module 6: Secure Agent Workspace]
 * xref:09-module-07-sre-capstone.adoc[Module 7: SRE Copilot Capstone]
 * xref:13-module-08-model-boundary-guardrails.adoc[Module 8: Model-Boundary Guardrails]
-* xref:12-security-ctf.adoc[Optional: Security CTF]
+* xref:12-security-ctf.adoc[Security CTF]
+== Wrap-up
 * xref:11-cleanup.adoc[Cleanup]
 * xref:10-reference.adoc[Technical Reference]

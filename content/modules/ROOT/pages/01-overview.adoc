@@ -41,6 +41,13 @@ workshop evaluates:
 | The managed agent calls the virtual `inference.local` endpoint. The gateway
   holds the upstream provider configuration and credential.
 
+| Model boundary
+| NeMo Guardrails (TrustyAI on OpenShift AI)
+| An OpenAI-compatible guardrails server in front of the model: input and
+  output rails limit what the model receives and returns, and the model
+  credential stays server-side. Complements OpenShell; it does not constrain
+  what the sandbox runtime can execute.
+
 | Production workspace
 | Secure Agent Workspace
 | The workshop SAW implementation provisions a dedicated KubeVirt VM for the
@@ -93,9 +100,16 @@ boundary; it does not replace OpenShell policy.
 
 === 5. Operations
 
-The optional fleet extension assigns telemetry capabilities to separate
+The fleet capstone assigns telemetry capabilities to separate
 sandboxes and requires confirmation before the incident workflow changes
 cluster state.
+
+=== 6. Model boundary
+
+Deploy a NeMo Guardrails server on OpenShift AI, prove that rails block
+sensitive input before the model call, and wire a client application through
+the OpenAI SDK. This layer limits what the model receives and returns; it does
+not replace the sandbox controls above.
 
 == Interpretation guardrails
 
@@ -108,5 +122,11 @@ Pod and VM isolation are layered deployment choices. The pod-based path exposes
 the OpenShell controls directly. The SAW path places the gateway and agent inside a
 dedicated VM for the configured owner and adds identity, secret delivery, and
 GitOps-managed configuration.
+
+The guardrails boundary is a third, independent layer. NeMo Guardrails
+enforces the configured rails at the model boundary — it does not constrain
+what the sandbox runtime can execute, and the sandbox policy does not filter
+what the model receives. State both boundaries when recommending the stack:
+each covers a different risk, and neither is comprehensive alone.
 
 Continue with xref:02-details.adoc[Prerequisites and Environment].
