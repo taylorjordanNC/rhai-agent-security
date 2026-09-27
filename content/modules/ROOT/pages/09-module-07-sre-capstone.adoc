@@ -106,6 +106,16 @@ make -C automation capstone-bootstrap
 oc get application module-7-prereqs -n {gitops_namespace}   # Synced, then Healthy
 ----
 
+NOTE: The DataScienceCluster that deploys RHOAI's components (the MLflow
+operator among them) is GitOps-managed here too:
+`{gitops_root}/dsc.yaml`, synced as part of `module-7-prereqs`. To customize
+your RHOAI deployment — enable or remove components — edit the
+`managementState` entries in that file (`Managed` deploys the component,
+`Removed` tears it down), commit and push, and Argo's self-heal reconciles
+the change on the cluster. Check what is enabled with `oc get
+datasciencecluster default-dsc -o yaml`. Do not create or edit the
+DataScienceCluster directly on the cluster: Argo reverts manual changes.
+
 The PostSync seed job plants the agent-session traces of a *prior* incident
 (`INC-4127`) into MLflow — the data the traces agent investigates below —
 and re-plants idempotently on each sync. What stays with the facilitator:

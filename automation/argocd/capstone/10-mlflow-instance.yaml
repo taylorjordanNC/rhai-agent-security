@@ -1,7 +1,8 @@
 # Module 7 prerequisite: the RHOAI MLflow instance the traces specialist queries.
-# Sync wave 1 — requires the RHOAI (OpenDataHub) MLflow operator to be installed
-# on the cluster (cluster baseline; the operator reconciles this CR into the
-# TLS-only MLflow server with the kubernetes-auth plugin and workspaces enabled).
+# Sync wave 1 — requires the RHOAI MLflow operator, deployed by the
+# DataScienceCluster in dsc.yaml (sync wave 0, same Application; the operator
+# reconciles this CR into the TLS-only MLflow server with the kubernetes-auth
+# plugin and workspaces enabled).
 # Sync wave 1 — after the namespace exists, before anything that queries it.
 apiVersion: mlflow.opendatahub.io/v1
 kind: MLflow
