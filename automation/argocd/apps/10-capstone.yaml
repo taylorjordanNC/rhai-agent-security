@@ -1,0 +1,54 @@
+# Module 7 capstone prerequisites — Argo CD child Application.
+#
+# Managed by the workshop root app-of-apps (automation/argocd/root.yaml): the
+# RHDP order's gitops path or a one-time `oc apply -f root.yaml` creates the
+# root, which then creates this child from this directory. To manage it
+# directly without the root:
+#
+#   oc apply -f automation/argocd/apps/10-capstone.yaml
+#
+# The Application watches this repository's automation/sre-capstone/components
+# directory. Sync waves order the components: openshell namespace (0), demo
+# shop (0), MLflow instance (1), telemetry proxy (2, needs openshell-agents
+# from the SAW deployment), incident console (3), seed RBAC (4). A PostSync
+# hook Job plants the incident-story traces after everything is healthy,
+# re-running idempotently on each sync.
+#
+# The capstone runtime depends on the SAW deployment (module 3, optional):
+# the telemetry proxy lands in openshell-agents and the seed Job in openshell.
+# Automated sync + retry holds this child in retry until SAW and the RHOAI
+# MLflow operator are healthy — no manual re-apply.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: module-7-prereqs
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/taylorjordanNC/rhai-agent-security.git
+    targetRevision: main
+    path: automation/sre-capstone/components
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo
+  ignoreDifferences:
+    # The incident console scales the shop to 0/2 during Exercise 4 — that is
+    # intentional drift, so Argo must not self-heal (revert) the replica count.
+    - group: apps
+      kind: Deployment
+      name: shop
+      namespace: demo
+      jsonPointers: ["/spec/replicas"]
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 3m

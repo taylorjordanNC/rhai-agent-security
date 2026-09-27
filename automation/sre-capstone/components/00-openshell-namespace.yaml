@@ -1,0 +1,18 @@
+# Module 7 prerequisite: the openshell workspace namespace the seed Job (and
+# the SAW-managed agent fleet) run in. Sync wave 0 — created before everything
+# else in this Application so the GitOps-first path (RHDP order / root
+# app-of-apps applied before the module 1 exercises run) does not depend on
+# the raw-track harness creating the namespace.
+# The mlflow-workspace label lets MLflow's workspace store resolve the
+# namespace by that label (see the module-7-prereqs prerequisites).
+# Note: on a GitOps-managed cluster, removing this Application (or the root)
+# removes the namespace; run the workshop cleanup (module 11) only after the
+# GitOps teardown.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshell
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    mlflow-workspace: "true"
+    argocd.argoproj.io/sync-wave: "0"

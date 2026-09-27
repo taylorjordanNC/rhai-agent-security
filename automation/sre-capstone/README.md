@@ -1,13 +1,15 @@
 # Module 7 capstone prerequisites — Argo-managed cluster setup
 
 The components module 7 (SRE Copilot Capstone) needs up **before workshop
-participants proceed** live here as Argo CD–managed manifests. This repository
-is the GitOps source: `argocd.argoproj.io/Application module-7-prereqs` in the
-`vp-gitops` namespace points at `automation/sre-capstone/components` on
-`taylorjordanNC/rhai-agent-security@main`.
+participants proceed** live here as Argo CD–managed manifests. This directory
+is the GitOps source for the `module-7-prereqs` child Application, managed by
+the workshop root app-of-apps (`../argocd/root.yaml`), which points at
+`automation/sre-capstone/components` on `taylorjordanNC/rhai-agent-security@main`
+in the cluster's `openshift-gitops` instance.
 
 | Component | Sync wave | Namespace | Purpose |
 |---|---|---|---|
+| openshell namespace | 0 | — | the workspace namespace the seed Job (and the SAW fleet) run in; carries the `mlflow-workspace=true` label |
 | demo shop | 0 | `demo` | the instrumented `demo/shop` app the fleet investigates |
 | MLflow instance | 1 | `redhat-ods-applications` | `MLflow` CR — the traces specialist queries it through the proxy |
 | telemetry proxy | 2 | `openshell-agents` | plain-HTTP nginx in front of Thanos (8080) and MLflow (8081); the fleet's per-agent ceilings name this proxy |
@@ -16,22 +18,25 @@ is the GitOps source: `argocd.argoproj.io/Application module-7-prereqs` in the
 
 ## Prerequisites of this Application
 
-1. **SAW deployment up** (module 5–6): `openshell-agents` namespace, the
-   governance interceptor with the capstone fleet egress ceilings, Keycloak,
-   and the fleet sandboxes (`metrics`, `traces`, `analyst`) provisioned by the
+1. **SAW deployment up** (module 3, optional; the fleet script or the
+   participant's module 3 run): `openshell-agents` namespace, the governance
+   interceptor with the capstone fleet egress ceilings, Keycloak, and the
+   fleet sandboxes (`metrics`, `traces`, `analyst`) provisioned by the
    `saw-bom` chart via `apply_bom.py` on the workspace VM. Those stay in the
-   SAW fork's GitOps.
+   SAW fork's GitOps. The child holds in Argo retry until SAW is healthy.
 2. **RHOAI MLflow operator installed** (cluster baseline) — the operator
    reconciles the `MLflow` CR in wave 1.
-3. **`mlflow-workspace=true` label on the `openshell` namespace** — MLflow's
-   workspace store resolves the workspace by that label. (Verify/patch if the
-   SAW deployment did not set it: `oc label ns openshell mlflow-workspace=true`.)
-4. Cluster reachability + Argo CD Application support in `vp-gitops`.
+3. **`mlflow-workspace=true` label on the `openshell` namespace** — set
+   declaratively by the wave-0 component in this directory.
+4. Cluster reachability + Argo CD Application support in `openshift-gitops`.
 
 ## Bootstrap (one-time)
 
+The root app-of-apps creates this child. Either the RHDP order's gitops path
+points at `automation/argocd/apps`, or apply the root once:
+
 ```bash
-oc apply -f automation/sre-capstone/bootstrap/module-7-prereqs.yaml
+make -C automation capstone-bootstrap
 ```
 
 The Application self-syncs: waves 0–4 then the PostSync seed Job plants the
@@ -39,7 +44,7 @@ incident story (idempotent — re-plants on each sync so the story timestamps
 stay fresh). Check with:
 
 ```bash
-oc get application module-7-prereqs -n vp-gitops
+oc get application module-7-prereqs -n openshift-gitops
 oc logs job/incident-data-seed -n openshell
 ```
 

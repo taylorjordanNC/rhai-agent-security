@@ -1,11 +1,64 @@
 = Workshop Automation
 
-This directory contains the OpenShift OpenShell evaluation installer and the
-canonical policy used by the workshop.
+This directory contains the OpenShift OpenShell evaluation installer, the
+canonical policy used by the workshop, the workshop GitOps app-of-apps, and
+the fleet SAW deployment scripts.
 
 Secure Agent Workspace deployment assets are not copied into this directory.
 Follow the workshop instructions from the `saw-emulation-fixes` branch of the
 `taylorjordanNC/secure-agent-workspace` fork.
+
+== Workshop GitOps (app-of-apps)
+
+`argocd/` is the workshop's Argo CD entry point: `argocd/root.yaml` is the
+root app-of-apps Application, and `argocd/apps/` holds the child Applications
+it manages (currently `module-7-prereqs`, the Module 7 capstone
+prerequisites). The SAW deployment is deliberately *not* a child here — it is
+the SAW fork's Validated Patterns deployment (scripted by `fleet/` or run by
+participants in module 3).
+
+Point Argo at one path per cluster — either the RHDP order's gitops path
+targets `automation/argocd/apps` (the order creates the root), or apply the
+shipped root once:
+
+[source,bash]
+----
+oc apply -f automation/argocd/root.yaml
+----
+
+Pick one pointer per cluster; two roots managing the same children fight over
+ownership. Children that depend on SAW hold in retry until SAW and the RHOAI
+MLflow operator are healthy — no manual re-apply.
+
+The default Argo instance is `openshift-gitops` (the GitOps operator default).
+For a cluster where Argo CD runs elsewhere, swap the namespace in one pass:
+
+[source,bash]
+----
+sed -i.bak 's/namespace: openshift-gitops/namespace: vp-gitops/g' \
+  automation/argocd/root.yaml automation/argocd/apps/*.yaml
+----
+
+If the SAW fork or its Validated Patterns framework changes, update only the
+named knobs (`saw_gitops_namespace` in both Antora `antora.yml` files,
+parity-checked by `npm run validate:docs`) — nothing in the workshop GitOps
+references `vp-gitops` structurally.
+
+== Fleet SAW deployment (RHDP orders)
+
+`fleet/` loops the SAW fork's documented install over a credentials CSV —
+the **SAW as script** path for ~50 RHDP clusters. It calls only the fork's
+entry points (`make copy-images`, `./pattern.sh make install`, the HCO
+emulation loop), so fork updates flow through:
+
+[source,bash]
+----
+./automation/fleet/fleet-install.sh --jobs 5   # 50 clusters ≈ 2-3h
+./automation/fleet/fleet-status.sh             # read-only per-cluster poll
+----
+
+See `fleet/README.md` for the one-time shared assets (fork checkout,
+`values-secret.yaml`, SSH keypair) and the credentials file (gitignored).
 
 == Prerequisites
 
