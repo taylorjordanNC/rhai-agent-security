@@ -19,7 +19,7 @@ The workshop progresses through these tasks:
 . Deploy OpenClaw on the raw pod boundary and inspect its runtime.
 . Apply policy changes, test allowed and denied behavior, and correlate runtime
   evidence.
-. Install SAW (do these steps as prework, or deploy with script, for the shorter workshop track) — OpenShift Virtualization, OIDC, external secrets,
+. Install SAW as prework — or use an environment the facilitator deployed with the fleet install script — so the in-class core track stays short: OpenShift Virtualization, OIDC, external secrets,
   and GitOps governance.
 . Configure and validate an existing SAW deployment, regardless of who installed
   it.
@@ -60,15 +60,18 @@ The navigation groups the modules into two tracks. Pick by the time you have:
 * *Core track — about 2 hours in class*: Modules 1, 2, and 4. Deploy the
   gateway, prove policy enforcement on the pod boundary, then validate the
   SAW environment and drive the agent. Module 3 (90–150 min) is prework done
-  before class — or skip it entirely when the facilitator provides the SAW
-  environment.
+  before class — or skip it when the facilitator deploys SAW with the fleet
+  install script; either way, SAW is up before class.
 * *Extended track — everything, about 5.5 hours total*: adds Modules 5, 6, 7,
-  8, and the Security CTF to the core. The complete OpenShell → OpenClaw → SAW
-  experience plus the model-boundary layer and the fleet capstone.
+  8, and the Security CTF to the core — you set up everything yourself,
+  including Module 3. The complete OpenShell → OpenClaw → SAW experience plus
+  the model-boundary layer and the fleet capstone.
 
 Dependencies, so you can enter where your time allows:
 
-* Module 4 requires the SAW environment from Module 3 to be setup manually or by the facilitator as part of cluster setup.
+* Module 4 (core track) requires a running SAW environment — deployed by the
+  facilitator with the fleet install script, or installed by you as the
+  Module 3 prework before class.
 * Modules 5 and 6 require Module 4 (gateway configured, SAW validated).
 * The capstone (Module 7) requires SAW and Module 4's client configuration
   only — the raw-track modules (1-2) are not a prerequisite, so
@@ -92,7 +95,7 @@ Dependencies, so you can enter where your time allows:
 | 45 min
 
 | 3. Prework: Install Secure Agent Workspace
-| Install the SAW pattern and wait for the VM and setup Job.
+| Install the SAW pattern — or confirm the facilitator deployed it — and wait for the VM and setup Job.
 | 90-150 min, before class
 
 | 4. Validate and Operate Secure Agent Workspace

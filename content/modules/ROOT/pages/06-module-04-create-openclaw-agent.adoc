@@ -7,8 +7,9 @@ secrets, and GitOps governance around it. The validation flow is also a
 platform admin's day-2 checklist — the same steps to run when you inherit or
 demo an environment.
 
-This is the required entry point for SAW exercises. Use it after completing the
-Module 3 prework or against a facilitator-provisioned environment.
+This is the required entry point for SAW exercises and part of the core track.
+SAW must already be up — installed by you as the Module 3 prework before
+class, or deployed by the facilitator with the fleet install script.
 You will configure OIDC access, validate the deployed resources, inspect failure
 signals, and run OpenClaw through the SAW-managed NemoClaw sandbox.
 

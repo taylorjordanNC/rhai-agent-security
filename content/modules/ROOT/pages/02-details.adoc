@@ -6,6 +6,11 @@ deployment supplies the raw OpenShell gateway and policy sandbox. Secure Agent
 Workspace (SAW) supplies the cluster-resident NemoClaw/OpenClaw runtime inside a
 per-user VM.
 
+The core track (Modules 1, 2, and 4) operates SAW in Module 4, so a running
+SAW environment is core-track preparation: the facilitator deploys it with the
+fleet install script (`automation/fleet/`), or you install it yourself as the
+Module 3 prework before class.
+
 The local environment where you run commands from must have the `rhai-agent-security` repository available. Obtain its approved repository URL from the facilitator. Commands
 that reference `{automation_repo}` assume the terminal is at that checkout's
 repository root; verify `test -f {automation_repo}/Makefile` before starting.
@@ -15,7 +20,7 @@ workflow, and is not used by this workshop. The SAW integration installs a
 BOM-configured NemoClaw runtime in the VM and provisions its sandboxes through the
 OpenShell gateway.
 
-== Required for the core workshop
+== Required for the raw track (Modules 1, 2, and the Security CTF)
 
 Requirements provided by facilitators:
 
@@ -38,12 +43,17 @@ Requirements that must be handled by the users:
   `{openshell_version}`; the SAW guest gateway is `{openshell_saw_version}`.
   Do not mix client and gateway versions.
 
-The raw policy track does not require a model API key. The SAW workspace needs
-an inference provider configured through Vault and External Secrets Operator.
+Module 4 (core track) also uses the tools in this list — `oc`, the OpenShell
+CLI, and cluster access — but against the SAW gateway and its own version pin.
 
-== Required for SAW operation
+The raw policy track does not require a model API key.
 
-The OpenClaw/NemoClaw exercises run in a SAW VM on the same cluster. You need:
+== Required to operate SAW (Module 4 — part of the core track)
+
+Module 4 is part of the core track. It operates the SAW environment on the
+same cluster, so the SAW deployment is a core-track prerequisite: the
+facilitator deploys it with the fleet install script, or you install it as
+the Module 3 prework before class. Whoever deployed it, Module 4 needs:
 
 * `virtctl` matching the cluster when inspecting or troubleshooting a VM.
 * A Keycloak OIDC account for the SAW gateway.
@@ -52,8 +62,16 @@ The OpenClaw/NemoClaw exercises run in a SAW VM on the same cluster. You need:
 * The SAW checkout, generated SSH key, namespace read access, and assigned
   workspace details supplied by the facilitator.
 
-The core SAW exercises use a pre-provisioned workspace. The Module 3 prework
-(SAW installation) additionally requires:
+Module 4 assumes the environment already exists — it needs nothing beyond this
+list and the baseline above, regardless of who deployed SAW. The inference
+provider is configured at SAW install time (Module 3 or the facilitator)
+through Vault and External Secrets Operator; Module 4 only consumes it.
+
+== Required to install SAW (Module 3 prework — self-deployment only)
+
+Skip this list when the facilitator has already deployed SAW with the fleet
+install script. Installing SAW yourself as the Module 3 prework additionally
+requires:
 
 * Cluster-admin access and a dedicated workshop cluster.
 * At least 16 CPUs and 32 GiB of memory for software emulation, or nodes with
@@ -119,8 +137,8 @@ BOM-configured NemoClaw runtime in the VM.
 
 == Verify the command-line tools
 
-Install and verify the cluster-facing tools before connecting. Run the core
-check in every new terminal:
+Install and verify the cluster-facing tools before connecting. Run the
+baseline check in every new terminal:
 
 [source,bash,subs="attributes+"]
 ----
@@ -202,6 +220,11 @@ procedure creates its own SAW checkout — use that one.
 | This repository drives the harness; the SAW fork's canonical partials drive
   the deployment.
 |===
+
+The core track — Modules 1, 2, and 4 — spans both checkouts: Modules 1-2 run
+from the workshop repository root and Module 4 runs from the SAW checkout root.
+Have both checkouts ready before class, whether the facilitator deployed SAW
+with the fleet install script or you complete the Module 3 prework yourself.
 
 == Verify the workshop automation and SAW fork
 
