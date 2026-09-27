@@ -3,9 +3,12 @@
 # per cluster (or the current cluster with --current). Changes nothing.
 #
 # Usage:
-#   ./fleet-status.sh [--csv FILE] [--current]
+#   ./fleet-status.sh [--csv FILE] [--current] [--gate]
 #
 #   --current   check only the current oc context (single-cluster check)
+#   --gate      pre-flight: exit non-zero if any cluster's Argo CD
+#               Applications are not all Synced/Healthy — run before
+#               participants arrive
 #
 # CSV rows: name,server,username,password[,token] — an optional 5th token
 # column logs in with a bearer token instead of username/password.
@@ -22,10 +25,12 @@ SAW_GITOPS_NS="${SAW_GITOPS_NS:-openshift-gitops}"
 SAW_NS="${SAW_NS:-openshell-agents}"
 SETUP_JOB="${SETUP_JOB:-openshell-saw-setup}"
 CURRENT=0
+GATE=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --current) CURRENT=1; shift ;;
+    --gate) GATE=1; shift ;;
     --csv) CSV="$2"; shift 2 ;;
     --help|-h) grep -E '^# (Usage:|  --)' "$0" | sed 's/^# \{0,2\}//'; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -49,8 +54,30 @@ check_one() { # label  (uses the current oc context; caller logged in)
   oc get ns demo openshell "$SAW_NS" --no-headers 2>/dev/null || true
 }
 
+gate_check() { # uses the current oc context; 0 = cluster passes the gate
+  local total bad
+  total=$(oc get applications.argoproj.io -n "$SAW_GITOPS_NS" --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  if [[ "$total" -eq 0 ]]; then
+    echo "  [gate] FAIL — no Argo CD Applications in $SAW_GITOPS_NS"
+    return 1
+  fi
+  bad=$(oc get applications.argoproj.io -n "$SAW_GITOPS_NS" -o custom-columns='S:.status.sync.status H:.status.health.status' --no-headers 2>/dev/null | grep -cv 'Synced Healthy' || true)
+  if [[ "$bad" -gt 0 ]]; then
+    echo "  [gate] FAIL — $bad of $total Argo CD Applications not Synced/Healthy"
+    return 1
+  fi
+  if ! oc get ns demo openshell "$SAW_NS" >/dev/null 2>&1; then
+    echo "  [gate] FAIL — workshop namespaces missing"
+    return 1
+  fi
+  echo "  [gate] PASS"
+}
+
 if [[ $CURRENT -eq 1 ]]; then
   check_one "$(oc whoami --show-server 2>/dev/null || echo current)"
+  if [[ $GATE -eq 1 ]]; then
+    gate_check || exit 1
+  fi
   exit 0
 fi
 
@@ -71,6 +98,7 @@ while IFS= read -r row; do
 done < "$CSV"
 [[ ${#ROWS[@]} -gt 0 ]] || { echo "No cluster rows in $CSV" >&2; exit 1; }
 
+GATE_FAILED=0
 for row in "${ROWS[@]}"; do
   IFS=, read -r name server user password token <<<"$row"
   if [[ -n "${token:-}" ]]; then
@@ -81,12 +109,24 @@ for row in "${ROWS[@]}"; do
   fi
   if [[ $LOGIN_OK -eq 1 ]]; then
     check_one "$name"
+    if [[ $GATE -eq 1 ]]; then
+      gate_check || GATE_FAILED=$((GATE_FAILED+1))
+    fi
   else
     printf '\n----- %s -----\n  login failed for %s\n' "$name" "$server"
+    [[ $GATE -eq 1 ]] && GATE_FAILED=$((GATE_FAILED+1))
   fi
 done
 
 # Restore the caller's previous context.
 if [[ -n "${PREV_SERVER:-}" && -n "${PREV_USER:-}" ]]; then
   oc login "$PREV_SERVER" --username="$PREV_USER" --insecure-skip-tls-verify >/dev/null 2>&1 || true
+fi
+
+if [[ $GATE -eq 1 ]]; then
+  if [[ $GATE_FAILED -gt 0 ]]; then
+    echo "GATE FAILED: $GATE_FAILED of ${#ROWS[@]} cluster(s) not ready for participants" >&2
+    exit 1
+  fi
+  echo "GATE PASSED: all ${#ROWS[@]} cluster(s) ready for participants"
 fi

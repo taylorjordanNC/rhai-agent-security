@@ -116,6 +116,23 @@ the change on the cluster. Check what is enabled with `oc get
 datasciencecluster default-dsc -o yaml`. Do not create or edit the
 DataScienceCluster directly on the cluster: Argo reverts manual changes.
 
+NOTE: *If the fleet script failed on a cluster and participants hit missing
+prerequisites* (sandboxes never Ready, Module 7 exec commands failing), the
+diagnostic is one object: `oc get application module-7-prereqs -n
+{gitops_namespace}` — stuck OutOfSync/retrying means the SAW pattern never
+installed. The remedy is one idempotent command — the workshop side
+(DSC, MLflow, proxy, console, traces) recovers itself the moment SAW is
+healthy:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+./fleet-install.sh --only <cluster-name>
+----
+
+That bootstraps the single cluster and blocks until `module-7-prereqs` is
+Synced/Healthy. Before participants arrive, run `./fleet-status.sh --gate`
+across the fleet: it exits non-zero if any cluster is not ready.
+
 The PostSync seed job plants the agent-session traces of a *prior* incident
 (`INC-4127`) into MLflow — the data the traces agent investigates below —
 and re-plants idempotently on each sync. What stays with the facilitator:

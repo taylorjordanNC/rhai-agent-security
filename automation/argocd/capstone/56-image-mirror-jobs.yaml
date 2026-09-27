@@ -1,0 +1,198 @@
+# Module 7 prerequisite: quickstart image mirroring as parallel PreSync hook
+# Jobs (sync wave 1 — after the wave-0 RBAC, before the main manifests that
+# need the images). One Job per image, all concurrent — the phase is bounded
+# by the largest image instead of the sum (the fork's manual loop copies
+# serially). Hook-style on purpose: run-once per sync, no reconciler fight
+# with a participant's manual Module 3 `make copy-images`; skopeo re-copies
+# of already-mirrored images are cheap (blob-existence checks). BeforeHookCreation
+# cleans failed Jobs at the next sync, keeping logs on-cluster:
+#   oc logs job/mirror-<image> -n openshell-agents
+# Tags mirror the fork's `make copy-images` (OPENSHELL_VERSION=0.0.103, no v).
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mirror-openshell-gateway
+  namespace: openshell-agents
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 900
+  template:
+    spec:
+      serviceAccountName: image-mirror
+      restartPolicy: Never
+      containers:
+      - name: mirror
+        image: registry.redhat.io/ubi8/skopeo:latest
+        env:
+        - name: HOME
+          value: /tmp/skopeo-home
+        - name: XDG_RUNTIME_DIR
+          value: /tmp/xdg-runtime
+        - name: QUAY_REPO
+          value: quay.io/rh-ai-quickstart
+        - name: BUILD_NS
+          value: openshell-agents
+        - name: IMAGE
+          value: openshell-gateway
+        - name: VERSION
+          value: "0.0.103"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          mkdir -p "${HOME}" "${XDG_RUNTIME_DIR}"
+          TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+          skopeo copy --src-tls-verify=true --dest-tls-verify=false \
+            --dest-creds="unused:${TOKEN}" \
+            "docker://${QUAY_REPO}/${IMAGE}:${VERSION}" \
+            "docker://image-registry.openshift-image-registry.svc:5000/${BUILD_NS}/${IMAGE}:${VERSION}"
+          echo "Mirror complete: ${IMAGE}:${VERSION}"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mirror-openshell-gateway-docker
+  namespace: openshell-agents
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 900
+  template:
+    spec:
+      serviceAccountName: image-mirror
+      restartPolicy: Never
+      containers:
+      - name: mirror
+        image: registry.redhat.io/ubi8/skopeo:latest
+        env:
+        - name: HOME
+          value: /tmp/skopeo-home
+        - name: XDG_RUNTIME_DIR
+          value: /tmp/xdg-runtime
+        - name: QUAY_REPO
+          value: quay.io/rh-ai-quickstart
+        - name: BUILD_NS
+          value: openshell-agents
+        - name: IMAGE
+          value: openshell-gateway-docker
+        - name: VERSION
+          value: "0.0.103"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          mkdir -p "${HOME}" "${XDG_RUNTIME_DIR}"
+          TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+          skopeo copy --src-tls-verify=true --dest-tls-verify=false \
+            --dest-creds="unused:${TOKEN}" \
+            "docker://${QUAY_REPO}/${IMAGE}:${VERSION}" \
+            "docker://image-registry.openshift-image-registry.svc:5000/${BUILD_NS}/${IMAGE}:${VERSION}"
+          echo "Mirror complete: ${IMAGE}:${VERSION}"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mirror-nemoclaw-sandbox
+  namespace: openshell-agents
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 900
+  template:
+    spec:
+      serviceAccountName: image-mirror
+      restartPolicy: Never
+      containers:
+      - name: mirror
+        image: registry.redhat.io/ubi8/skopeo:latest
+        env:
+        - name: HOME
+          value: /tmp/skopeo-home
+        - name: XDG_RUNTIME_DIR
+          value: /tmp/xdg-runtime
+        - name: QUAY_REPO
+          value: quay.io/rh-ai-quickstart
+        - name: BUILD_NS
+          value: openshell-agents
+        - name: IMAGE
+          value: nemoclaw-sandbox
+        - name: VERSION
+          value: "0.0.103"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          mkdir -p "${HOME}" "${XDG_RUNTIME_DIR}"
+          TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+          skopeo copy --src-tls-verify=true --dest-tls-verify=false \
+            --dest-creds="unused:${TOKEN}" \
+            "docker://${QUAY_REPO}/${IMAGE}:${VERSION}" \
+            "docker://image-registry.openshift-image-registry.svc:5000/${BUILD_NS}/${IMAGE}:${VERSION}"
+          echo "Mirror complete: ${IMAGE}:${VERSION}"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mirror-nemoclaw-cli
+  namespace: openshell-agents
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 900
+  template:
+    spec:
+      serviceAccountName: image-mirror
+      restartPolicy: Never
+      containers:
+      - name: mirror
+        image: registry.redhat.io/ubi8/skopeo:latest
+        env:
+        - name: HOME
+          value: /tmp/skopeo-home
+        - name: XDG_RUNTIME_DIR
+          value: /tmp/xdg-runtime
+        - name: QUAY_REPO
+          value: quay.io/rh-ai-quickstart
+        - name: BUILD_NS
+          value: openshell-agents
+        - name: IMAGE
+          value: nemoclaw-cli
+        - name: VERSION
+          value: "0.0.103"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          mkdir -p "${HOME}" "${XDG_RUNTIME_DIR}"
+          TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+          skopeo copy --src-tls-verify=true --dest-tls-verify=false \
+            --dest-creds="unused:${TOKEN}" \
+            "docker://${QUAY_REPO}/${IMAGE}:${VERSION}" \
+            "docker://image-registry.openshift-image-registry.svc:5000/${BUILD_NS}/${IMAGE}:${VERSION}"
+          echo "Mirror complete: ${IMAGE}:${VERSION}"

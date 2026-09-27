@@ -1,0 +1,55 @@
+# Module 7 prerequisite: image-mirror RBAC, PreSync hooks (sync wave 0 — must
+# exist before the wave-1 mirror Jobs run). Hook-style on purpose: Argo runs
+# these once per sync and does not reconcile them as live resources, so a
+# participant's manual Module 3 `make copy-images` (which deletes and recreates
+# the mirror Jobs) never fights a reconciler. BeforeHookCreation cleans up
+# failed Jobs at the next sync, leaving logs on-cluster for diagnosis.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: image-mirror
+  namespace: openshell-agents
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "0"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: image-mirror-builder
+  namespace: openshell-agents
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "0"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-builder
+subjects:
+- kind: ServiceAccount
+  name: image-mirror
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: image-mirror-nonroot-scc
+  namespace: openshell-agents
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "0"
+roleRef:
+  apiGroup: security.openshift.io
+  kind: SecurityContextConstraints
+  name: nonroot
+subjects:
+- kind: ServiceAccount
+  name: image-mirror

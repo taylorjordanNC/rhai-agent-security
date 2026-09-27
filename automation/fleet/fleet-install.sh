@@ -21,6 +21,10 @@
 #   --wait            after each install, wait for the SAW setup Job to
 #                     complete (default: apply-and-move-on; the VM setup runs
 #                     in-cluster for up to ~3h — poll with fleet-status.sh)
+#   --only NAME       bootstrap ONE cluster (the facilitator remedy): install,
+#                     then block until the workshop Application
+#                     (module-7-prereqs) is Synced/Healthy — participants
+#                     proceed the moment this returns
 #   --no-emulation    skip the HCO software-emulation step (KVM-capable clusters)
 #   --dry-run         print the per-cluster plan without logging in or installing#
 # Shared one-time assets (created once, reused for every cluster):
@@ -39,12 +43,14 @@ SAW_REF="${SAW_REF:-saw-emulation-fixes}"
 SAW_GITOPS_NS="${SAW_GITOPS_NS:-openshift-gitops}"
 SAW_NS="${SAW_NS:-openshell-agents}"
 SETUP_JOB="${SETUP_JOB:-openshell-saw-setup}"
+WORKSHOP_APP="${WORKSHOP_APP:-module-7-prereqs}"
 FLEET_KC_DIR="${FLEET_KC_DIR:-$HOME/.saw-fleet}"
 
 JOBS=1
 WAIT=0
 EMULATION=1
 DRY_RUN=0
+ONLY=""
 
 usage() { grep -E '^# (Usage:|Options:|  --)' "$0" | sed 's/^# \{0,2\}//'; exit "${1:-0}"; }
 
@@ -53,6 +59,7 @@ while [[ $# -gt 0 ]]; do
     --csv) CSV="$2"; shift 2 ;;
     --jobs) JOBS="$2"; shift 2 ;;
     --wait) WAIT=1; shift ;;
+    --only) ONLY="$2"; shift 2 ;;
     --no-emulation) EMULATION=0; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     --help|-h) usage 0 ;;
@@ -116,6 +123,16 @@ wait_for_setup_job() {
     || { echo "  [$name] SAW setup Job did not complete in time (check fleet-status.sh)" >&2; return 1; }
 }
 
+wait_for_workshop_app() { # --only remedy: block until the workshop child converges
+  local deadline=$((SECONDS + 1800)) # 30 min: DSC + MLflow + waves 0-4 + PostSync seed
+  echo "  [remedy] Waiting for application/$WORKSHOP_APP to converge (up to 30 min; poll fleet-status.sh instead)..."
+  until oc get "application/$WORKSHOP_APP" -n "$SAW_GITOPS_NS" -o jsonpath='{.status.sync.status} {.status.health.status}' 2>/dev/null | grep -q 'Synced Healthy'; do
+    (( SECONDS > deadline )) && { echo "  [remedy] application/$WORKSHOP_APP did not converge in time (check fleet-status.sh)" >&2; return 1; }
+    sleep 30
+  done
+  echo "  [remedy] application/$WORKSHOP_APP Synced and Healthy — participants may proceed"
+}
+
 install_cluster() {
   local name="$1" server="$2" user="$3" password="$4" token="$5" worker="$6"
   echo "[$name] $server"
@@ -151,7 +168,13 @@ install_cluster() {
   fi
   if [[ $WAIT -eq 1 ]]; then
     wait_for_setup_job "$name" || true
-  else
+  fi
+  if [[ -n "$ONLY" && $DRY_RUN -eq 0 ]]; then
+    # Facilitator remedy: participants need the workshop child green, not just
+    # the pattern bootstrap — block until module-7-prereqs is Synced/Healthy.
+    wait_for_workshop_app || true
+  fi
+  if [[ $WAIT -eq 0 && -z "$ONLY" ]]; then
     echo "  [$name] Install submitted. VM setup continues in-cluster (~1-3h); poll fleet-status.sh"
   fi
 }
@@ -167,6 +190,16 @@ while IFS= read -r row; do
   esac
 done < "$CSV"
 [[ ${#ROWS[@]} -gt 0 ]] || { echo "No cluster rows in $CSV" >&2; exit 1; }
+if [[ -n "$ONLY" ]]; then
+  FILTERED=()
+  for row in "${ROWS[@]}"; do
+    IFS=, read -r name _rest <<<"$row"
+    [[ "$name" == "$ONLY" ]] && FILTERED+=("$row")
+  done
+  [[ ${#FILTERED[@]} -eq 1 ]] || { echo "Cluster '$ONLY' not found in $CSV (exactly one row required)" >&2; exit 1; }
+  ROWS=("${FILTERED[@]}")
+  JOBS=1 # single cluster — no parallel workers needed
+fi
 echo "Fleet SAW install: ${#ROWS[@]} cluster(s), jobs=$JOBS, wait=$WAIT, emulation=$EMULATION"
 
 run_one() { # idx, row, worker number
