@@ -42,10 +42,30 @@ spec:
       name: shop
       namespace: demo
       jsonPointers: ["/spec/replicas"]
+    # RHOAI OLM objects are declared in parity with the SAW fork's
+    # values-prod (see capstone/50-rhods-operator.yaml): the workshop pre-sets
+    # them, the SAW pattern adopts them identically. The SAW chart injects its
+    # tracking-id annotation and controllers inject SCC/PSA annotations into
+    # these objects — this child reconciles spec fields only, so annotation
+    # diffs are ignored to avoid churn between the two self-healing managers.
+    # RespectIgnoreDifferences (below) keeps those annotations on apply.
+    - group: operators.coreos.com
+      kind: Subscription
+      jsonPointers: ["/metadata/annotations"]
+    - group: operators.coreos.com
+      kind: OperatorGroup
+      jsonPointers: ["/metadata/annotations"]
+    - group: ""
+      kind: Namespace
+      name: redhat-ods-operator
+      jsonPointers: ["/metadata/annotations"]
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      - Validate=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:

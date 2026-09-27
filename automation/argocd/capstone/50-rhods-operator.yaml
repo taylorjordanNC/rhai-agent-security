@@ -1,0 +1,48 @@
+# Module 7 prerequisite: the RHOAI operator stack (Namespace + OperatorGroup +
+# Subscription) as part of the workshop gitops — pre-set before the SAW fleet
+# script runs. Parity: the SAW fork's values-prod.yaml declares the identical
+# objects (the `openshift-ai` subscription and the redhat-ods-operator
+# namespace), so the two paths coexist — the workshop pre-sets them on fresh
+# clusters, the SAW pattern adopts them identically when the fleet script or
+# module 3 runs. apps/10-capstone.yaml ignores annotation diffs on these kinds
+# (the SAW chart injects its tracking-id; controllers inject SCC/PSA
+# annotations) so the two self-healing managers never churn each other.
+# Channel parity is guarded by automation/fleet/check-channel-parity.sh.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: redhat-ods-operator
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/managed-by: openshift-gitops
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+    argocd.argoproj.io/sync-wave: "0"
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: redhat-ods-operator-operator-group
+  namespace: redhat-ods-operator
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  targetNamespaces: []
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: rhods-operator
+  namespace: redhat-ods-operator
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  channel: eus-3.5
+  installPlanApproval: Automatic
+  name: rhods-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
