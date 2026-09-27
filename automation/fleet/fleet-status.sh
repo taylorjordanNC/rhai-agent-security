@@ -55,13 +55,16 @@ check_one() { # label  (uses the current oc context; caller logged in)
 }
 
 gate_check() { # uses the current oc context; 0 = cluster passes the gate
-  local total bad
-  total=$(oc get applications.argoproj.io -n "$SAW_GITOPS_NS" --no-headers 2>/dev/null | wc -l | tr -d ' ')
-  if [[ "$total" -eq 0 ]]; then
-    echo "  [gate] FAIL — no Argo CD Applications in $SAW_GITOPS_NS"
+  # Fail-closed: a failed or empty query means the cluster does NOT pass.
+  local apps total bad
+  apps=$(oc get applications.argoproj.io -n "$SAW_GITOPS_NS" -o custom-columns='S:.status.sync.status,H:.status.health.status' --no-headers 2>/dev/null) || true
+  if [[ -z "$apps" ]]; then
+    echo "  [gate] FAIL — no Argo CD Applications in $SAW_GITOPS_NS (or the query failed)"
     return 1
   fi
-  bad=$(oc get applications.argoproj.io -n "$SAW_GITOPS_NS" -o custom-columns='S:.status.sync.status H:.status.health.status' --no-headers 2>/dev/null | grep -cv 'Synced Healthy' || true)
+  total=$(echo "$apps" | wc -l | tr -d ' ')
+  # oc custom-columns pads columns to fixed width — match on any whitespace.
+  bad=$(echo "$apps" | grep -cvE 'Synced[[:space:]]+Healthy' || true)
   if [[ "$bad" -gt 0 ]]; then
     echo "  [gate] FAIL — $bad of $total Argo CD Applications not Synced/Healthy"
     return 1
