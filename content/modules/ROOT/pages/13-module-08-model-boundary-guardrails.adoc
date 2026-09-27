@@ -784,6 +784,4 @@ test -z "$(oc get ns -o name | grep {guardrails_namespace})"
   Secret injection behavior, and how to escape Go template syntax when
   pasting custom configs.
 
-When finished, continue to xref:12-security-ctf.adoc[the Security
-CTF] to apply the raw OpenShell control layers against timed challenges, or
-xref:11-cleanup.adoc[Cleanup] to remove the environment.
+When finished, continue to xref:11-cleanup.adoc[Cleanup] to remove the environment.

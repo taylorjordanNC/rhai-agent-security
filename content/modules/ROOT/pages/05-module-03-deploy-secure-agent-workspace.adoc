@@ -1,9 +1,9 @@
 = Module 3: Prework — Install Secure Agent Workspace
 :navtitle: SAW Prework
 
-This prework module installs Secure Agent Workspace (SAW) on the OpenShift
-cluster. Do it before class — or skip it when the facilitator has deployed
-SAW with the fleet install script. Either way, a running SAW environment is
+This module installs Secure Agent Workspace (SAW) on the OpenShift
+cluster. Skip this module when the facilitator has deployed
+SAW with the fleet install script for the workshop. Either way, a running SAW environment is
 core-track preparation:
 xref:06-module-04-create-openclaw-agent.adoc[Module 4], where the core track
 picks up SAW, assumes the environment is already up.

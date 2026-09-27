@@ -29,7 +29,6 @@ The workshop progresses through these tasks:
 . Investigate a payments outage with the governance-scoped agent fleet.
 . Deploy a NeMo Guardrails server on OpenShift AI, prove rails block sensitive
   input before the model call, and wire a client application.
-. Attempt the security CTF challenges against the raw OpenShell sandbox environment.
 
 == Learning objectives
 
@@ -51,7 +50,8 @@ By the end of the workshop you will be able to:
 Each exercise identifies the state to change, the evidence to inspect, and the
 result that must be verified. Do not treat command completion as proof. Compare
 the observed resource, policy, or event with the stated pass condition before
-continuing.
+continuing. Facilitators provisioning environments ahead of class: see
+xref:14-facilitator-guide.adoc[Facilitator Guide].
 
 == Choose your track by allotted time
 
@@ -62,8 +62,8 @@ The navigation groups the modules into two tracks. Pick by the time you have:
   SAW environment and drive the agent. Module 3 (90–150 min) is prework done
   before class — or skip it when the facilitator deploys SAW with the fleet
   install script; either way, SAW is up before class.
-* *Extended track — everything, about 5.5 hours total*: adds Modules 5, 6, 7,
-  8, and the Security CTF to the core — you set up everything yourself,
+* *Extended track — everything, about 5 hours total*: adds Modules 5, 6, 7,
+  and 8 to the core — you set up everything yourself,
   including Module 3. The complete OpenShell → OpenClaw → SAW experience plus
   the model-boundary layer and the fleet capstone.
 
@@ -78,7 +78,6 @@ Dependencies, so you can enter where your time allows:
   time-constrained participants can jump straight to it.
 * Module 8 (guardrails) is fully standalone — it needs only the OpenShift AI
   foundation and an API key.
-* The Security CTF requires Modules 1-2 (it challenges the raw OpenShell controls).
 
 == Workshop map
 
@@ -125,12 +124,9 @@ Dependencies, so you can enter where your time allows:
 | Deploy a NeMo Guardrails server, prove rails block sensitive input, and wire a client application.
 | 75 min
 
-| 9. Security CTF
-| Apply every raw OpenShell control layer against timed challenges.
-| 30 min
 |===
 
-*Extended track total:* about 5.5 hours including the core track — the
+*Extended track total:* about 5 hours including the core track — the
 complete experience.
 
 == Technical model

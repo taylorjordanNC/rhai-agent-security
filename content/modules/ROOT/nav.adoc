@@ -17,3 +17,6 @@
 .Wrap-up
 * xref:11-cleanup.adoc[Cleanup]
 * xref:10-reference.adoc[Technical Reference]
+
+.Facilitators
+* xref:14-facilitator-guide.adoc[Facilitator Guide]
