@@ -85,16 +85,47 @@ create_jwt_secret() {
     info "JWT signing secret created"
 }
 
+wait_for_agent_sandbox_csv() {
+    local ns="$1" csv="" i
+    for i in $(seq 1 30); do
+        csv=$(oc -n "$ns" get subscription agent-sandbox-operator \
+            -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)
+        if [ -n "$csv" ]; then
+            break
+        fi
+        sleep 5
+    done
+
+    if [ -z "$csv" ]; then
+        error "Agent Sandbox operator CSV not found after 150s"
+        return 1
+    fi
+
+    info "Waiting for $csv..."
+    oc -n "$ns" wait --for=jsonpath='{.status.phase}'=Succeeded \
+        csv/"$csv" --timeout=300s
+    info "Agent Sandbox operator CSV Succeeded ($csv)"
+}
+
 install_agent_sandbox_operator() {
     step "Install Red Hat Agent Sandbox operator"
 
+    # When the CRD is already present, look for the operator subscription in
+    # any namespace — some clusters install this operator outside
+    # openshift-operators (e.g. its own agent-sandbox-system namespace). A
+    # Succeeded CSV means the operator is already installed; skip the install.
     if oc get crd sandboxes.agents.x-k8s.io &>/dev/null; then
-        if oc -n openshift-operators get subscription agent-sandbox-operator &>/dev/null; then
-            info "Agent Sandbox CRD and operator subscription already present; verifying the CSV"
-        else
-            error "Agent Sandbox CRD exists without the expected operator subscription. Verify the controller or remove the stale CRD before continuing."
-            exit 1
+        local sub_ns
+        sub_ns=$(oc get subscriptions.operators.coreos.com -A \
+            -o jsonpath='{range .items[?(@.spec.name=="agent-sandbox-operator")]}{.metadata.namespace}{"\n"}{end}' \
+            2>/dev/null | head -1)
+        if [ -n "$sub_ns" ]; then
+            info "Agent Sandbox CRD and operator subscription already present in namespace $sub_ns; verifying the CSV"
+            wait_for_agent_sandbox_csv "$sub_ns"
+            return 0
         fi
+        error "Agent Sandbox CRD exists without any agent-sandbox-operator subscription. Verify the controller or remove the stale CRD before continuing."
+        exit 1
     fi
 
     cat <<'EOF' | oc apply -f -
@@ -112,25 +143,7 @@ spec:
 EOF
 
     info "Waiting for operator CSV to succeed..."
-    local csv=""
-    for i in $(seq 1 30); do
-        csv=$(oc -n openshift-operators get subscription agent-sandbox-operator \
-            -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)
-        if [ -n "$csv" ]; then
-            break
-        fi
-        sleep 5
-    done
-
-    if [ -z "$csv" ]; then
-        error "Agent Sandbox operator CSV not found after 150s"
-        exit 1
-    fi
-
-    info "Waiting for $csv..."
-    oc -n openshift-operators wait --for=jsonpath='{.status.phase}'=Succeeded \
-        csv/"$csv" --timeout=300s
-    info "Agent Sandbox operator installed ($csv)"
+    wait_for_agent_sandbox_csv openshift-operators
 }
 
 create_openshell_namespace() {
