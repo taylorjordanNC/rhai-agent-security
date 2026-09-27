@@ -7,32 +7,33 @@
 |===
 | Repository | Use it for
 
-| `OpenShell`
+| link:https://docs.nvidia.com/openshell/latest/[OpenShell^]
 | OpenShell gateway, Kubernetes/OpenShift Helm deployment, raw sandbox
   lifecycle, policy engine, CLI, logs, and the canonical L7 policy quickstart.
 
-| `NemoClaw`
+| link:https://github.com/NVIDIA/NemoClaw[NemoClaw^]
 | The OpenClaw reference runtime and policy model. Its standalone onboarding is
   a local container workflow; the cluster workshop uses the BOM-configured
   NemoClaw runtime integrated into Secure Agent Workspace.
 
-| `agent-harness-in-a-box`
+| link:https://github.com/rh-aiservices-bu/agent-harness-in-a-box[agent-harness-in-a-box^]
 | Source of truth for the raw OpenShift evaluation deployment, gateway access,
-  harness SCC behavior, and basic sandbox exercises.
+  raw OpenShell SCC behavior, and basic sandbox exercises.
 
-| `nemoclaw-openshift-launchable`
+| link:https://github.com/mamurak/nemoclaw-openshift-launchable[nemoclaw-openshift-launchable^]
 | Context reference for OpenClaw interaction, configuration, UI forwarding,
   observability, fleet, and incident exercises. Its pinned gateway and Agent
   Sandbox versions are not the compatibility baseline for this workshop.
 
-| `secure-agent-workspace`
+| link:https://github.com/taylorjordanNC/secure-agent-workspace[secure-agent-workspace^]
 | Source of truth for the cluster NemoClaw/OpenClaw path: KubeVirt VM isolation,
   OpenShell guest gateway, Keycloak OIDC, Vault/ESO, governance interceptor,
   policy profiles, Validated Patterns/ArgoCD, and the canonical
   xref:secure-agent-workspace:ROOT:deployment-guide.adoc[deployment guide].
 
-| `rhai-agent-security`
-| The tested workshop sequence, local raw-harness automation, SAW integration
+| link:https://github.com/taylorjordanNC/rhai-agent-security[rhai-agent-security^]
+| The tested workshop sequence, raw OpenShell sandbox environment automation,
+  SAW integration
   instructions, policy exercises, and evidence checkpoints.
 |===
 
@@ -97,7 +98,8 @@ the OpenShell sandbox claims above; its pass conditions are stated in Module
 Retain these artifacts when recording workshop results:
 
 * The effective sandbox policy and a sample audit event.
-* The architecture diagram identifying the OpenShift cluster, harness OpenShell,
+* The architecture diagram identifying the OpenShift cluster, raw OpenShell
+  sandbox environment,
   SAW VM, OpenClaw/NemoClaw,
   Keycloak, Vault, and the governance interceptor.
 * A capability matrix mapping each agent to its allowed backends.
