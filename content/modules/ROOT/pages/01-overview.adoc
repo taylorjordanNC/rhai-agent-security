@@ -22,8 +22,8 @@ workshop evaluates:
 
 | Platform
 | One multinode OpenShift {ocp_version} cluster
-| The harness provides the evaluation path on plain pods (the raw track).
-  Secure Agent Workspace
+| The raw OpenShell sandbox environment provides the evaluation path on plain
+  pods. Secure Agent Workspace
   provides the cluster-resident NemoClaw/OpenClaw path inside a per-user VM.
 
 | Sandbox control plane
@@ -59,10 +59,10 @@ workshop evaluates:
 
 Two components to understand and be able to explain are:
 
-* The *OpenShell gateway* is the platform control plane. The raw track — the
-  workshop's name for the evaluation path on plain pods, no VM layer — reaches
-  the harness gateway through a local port-forward; the SAW track reaches a
-  per-user gateway VM through an OIDC-authenticated Route.
+* The *OpenShell gateway* is the platform control plane. The raw OpenShell
+  sandbox environment — the workshop's evaluation path on plain pods, no VM
+  layer — reaches the OpenShell gateway through a local port-forward; the SAW
+  deployment reaches a per-user gateway VM through an OIDC-authenticated Route.
 * The *OpenClaw gateway* is the agent's own control UI and WebSocket service,
   running inside the managed sandbox. The SAW BOM and setup Job configure its
   lifecycle, and the fork's Make targets provide local dashboard forwarding.
@@ -83,8 +83,8 @@ resources that represent it.
 === 2. Containment
 
 Inspect the effective policy, run allowed and denied operations, and correlate
-each result with gateway evidence. The raw-track harness is an evaluation
-boundary, not the SAW VM-isolated deployment.
+each result with gateway evidence. The raw OpenShell sandbox environment is an
+evaluation boundary, not the SAW VM-isolated deployment.
 
 === 3. Usefulness
 

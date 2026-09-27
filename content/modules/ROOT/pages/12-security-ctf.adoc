@@ -2,7 +2,8 @@
 :navtitle: Security CTF
 
 This extended-track module turns the Module 2 control layers into timed challenges.
-Work from the raw track: the `{raw_gateway_name}` gateway and the
+Work from the raw OpenShell sandbox environment: the `{raw_gateway_name}`
+gateway and the
 `{raw_sandbox_name}` sandbox from Modules 1-2, with the quickstart policy
 applied. Each challenge states a goal; you produce the evidence that proves the
 control, not just the command output. Facilitators award points for evidence.
@@ -97,7 +98,7 @@ Evidence:
 Record the total score with the workshop evidence bundle. The challenges
 exercise the same controls as Module 2; the difference is that participants
 must assemble the proof themselves. A participant who completes all five
-challenges has demonstrated every raw-track control layer without the
+challenges has demonstrated every raw OpenShell control layer without the
 module walkthroughs.
 
 When finished, continue to xref:11-cleanup.adoc[Cleanup].

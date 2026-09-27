@@ -7,7 +7,7 @@ per-agent access, investigate live telemetry, drive a real outage in the
 browser, and confirm the remediation as a human.
 
 Prerequisites: SAW up and Module 4's client configuration only — the
-raw-track modules (1-2) are not a prerequisite, so time-constrained
+raw OpenShell modules (1-2) are not a prerequisite, so time-constrained
 participants can jump straight here.
 
 == Why this matters

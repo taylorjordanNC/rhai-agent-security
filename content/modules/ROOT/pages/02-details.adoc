@@ -1,8 +1,9 @@
 = Prerequisites and Environment
 :navtitle: Prerequisites and Environment
 
-This workshop uses one multinode OpenShift {ocp_version} cluster. The harness
-deployment supplies the raw OpenShell gateway and policy sandbox. Secure Agent
+This workshop uses one multinode OpenShift {ocp_version} cluster. The raw
+OpenShell sandbox environment supplies the raw OpenShell gateway and policy
+sandbox. Secure Agent
 Workspace (SAW) supplies the cluster-resident NemoClaw/OpenClaw runtime inside a
 per-user VM.
 
@@ -20,7 +21,7 @@ workflow, and is not used by this workshop. The SAW integration installs a
 BOM-configured NemoClaw runtime in the VM and provisions its sandboxes through the
 OpenShell gateway.
 
-== Required for the raw track (Modules 1, 2, and the Security CTF)
+== Required for the raw OpenShell sandbox environment (Modules 1, 2, and the Security CTF)
 
 Requirements provided by facilitators:
 
@@ -28,7 +29,7 @@ Requirements provided by facilitators:
 * Cluster-admin permission to install an OLM Subscription and cluster-scoped
   Agent Sandbox CRDs/RBAC, grant the privileged SCC to the sandbox service
   account, create the `openshell` namespace, and install a Helm release.
-* The Red Hat Agent Sandbox operator channel used by the harness,
+* The Red Hat Agent Sandbox operator channel used by the raw OpenShell install,
   `{agent_sandbox_channel}`.
 * A default StorageClass. The OpenShell gateway stores its SQLite data in a
   1Gi PVC.
@@ -39,7 +40,7 @@ Requirements that must be handled by the users:
 
 * `oc` authenticated to the target cluster.
 * Helm 3.x, Git, `curl`, OpenSSL, `tar`, `install`, and standard Unix shell tools.
-* The OpenShell CLI matching the selected gateway. The harness baseline is
+* The OpenShell CLI matching the selected gateway. The raw OpenShell baseline is
   `{openshell_version}`; the SAW guest gateway is `{openshell_saw_version}`.
   Do not mix client and gateway versions.
 
@@ -207,7 +208,8 @@ procedure creates its own SAW checkout — use that one.
 
 | `rhai-agent-security` repository root
 | Prerequisites, 1, 2, Security CTF, 8
-| The harness automation, policy files, the guardrails chart, and the
+| The raw OpenShell sandbox environment automation, policy files, the
+  guardrails chart, and the
   teardown live in this checkout.
 
 | The SAW checkout root
@@ -217,7 +219,8 @@ procedure creates its own SAW checkout — use that one.
 
 | Both
 | 3 (SAW prework)
-| This repository drives the harness; the SAW fork's canonical partials drive
+| This repository drives the raw OpenShell sandbox environment; the SAW fork's
+  canonical partials drive
   the deployment.
 |===
 
@@ -236,7 +239,7 @@ that repository directly:
 [source,bash,subs="attributes+"]
 ----
 test -f {automation_repo}/Makefile
-test -f {automation_repo}/harness/01-basic-openshell/install.sh
+test -f {automation_repo}/openshell-env/install.sh
 test -f {automation_repo}/policies/sandbox-policy-quickstart.yaml
 test -n "$(git ls-remote --heads {saw_repo_url} refs/heads/{saw_repo_branch})"
 ----

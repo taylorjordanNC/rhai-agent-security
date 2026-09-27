@@ -243,7 +243,7 @@ agent while you drive it from the TUI.
 
 The sandbox is managed by OpenShell and provisioned by SAW. Do not create a
 second sandbox with `nemoclaw onboard` or point the standalone NemoClaw CLI at
-the harness gateway.
+the raw OpenShell gateway.
 
 == Exercise 5: Run and verify an agent request
 

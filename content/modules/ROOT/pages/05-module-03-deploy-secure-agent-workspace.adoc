@@ -16,7 +16,8 @@ deployment command changes; do not duplicate the procedure in this repository.
 
 == Deployment scope
 
-The raw harness and SAW deployment are separate environments. This installation
+The raw OpenShell sandbox environment and SAW deployment are separate
+environments. This installation
 adds a KubeVirt VM for the configured workspace owner, an OpenShell gateway and
 container runtime inside that VM, Keycloak OIDC, Vault and External Secrets, a
 governance interceptor, and GitOps-managed configuration.

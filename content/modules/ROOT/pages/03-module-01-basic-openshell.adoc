@@ -21,16 +21,17 @@ service from the OpenShell resources that govern an individual sandbox.
 
 == Learning objectives
 
-* Deploy the harness OpenShell Helm chart on OpenShift.
+* Deploy the raw OpenShell Helm chart on OpenShift.
 * Explain the Agent Sandbox controller, namespace, SCC admission, Helm release,
-  and gateway storage used by the harness baseline.
+  and gateway storage used by the raw OpenShell baseline.
 * Register the gateway and verify the CLI connection.
 * Create and inspect a disposable sandbox.
 * Deploy OpenClaw on the local gateway and identify the runtime boundary.
 
 == Exercise 1: Deploy the gateway
 
-Use the bundled harness automation for the participant baseline. It
+Use the bundled raw OpenShell sandbox environment automation for the
+participant baseline. It
 intentionally runs unencrypted and unauthenticated, reachable only through a
 local port-forward; the SAW deployment module adds OIDC, TLS, VM isolation, and
 centralized secrets.
@@ -43,14 +44,14 @@ make -C {automation_repo} install-openshell \
   OPENSHELL_VERSION={openshell_version}
 ----
 
-The harness installation sequence is:
+The raw OpenShell installation sequence is:
 
 . Installs the Red Hat Agent Sandbox operator through OLM, which provides the
   Kubernetes `Sandbox` CRDs and controller.
 . Creates the `openshell` namespace.
 . Grants the privileged SCC required by this older evaluation baseline.
 . Creates the gateway JWT signing Secret.
-. Installs the NVIDIA OpenShell Helm chart with the harness OpenShift settings.
+. Installs the NVIDIA OpenShell Helm chart with the raw OpenShift settings.
 . Pins the default sandbox image to `{openshell_sandbox_image}`.
 . Waits for the gateway StatefulSet and its PVC.
 . Deploys the in-cluster `http-echo` service used by the Module 2 policy exercises.
@@ -61,8 +62,9 @@ Expected result: the script ends with the `Setup complete!` banner and next
 steps. If an earlier step fails, the message names the failing step — fix that
 layer before rerunning.
 
-The privileged SCC is a limitation of this harness baseline, not a production
-recommendation. SAW provides the stronger per-user VM boundary used later.
+The privileged SCC is a limitation of this raw OpenShell baseline, not a
+production recommendation. SAW provides the stronger per-user VM boundary used
+later.
 
 Start a local gateway port-forward after the script completes. The gateway is
 internal to the cluster, so the CLI reaches it through this tunnel only. Keep
@@ -103,9 +105,9 @@ Route.
 ====
 
 The Agent Sandbox controller reconciles the sandbox request, while OpenShell
-provides the gateway and supervisor that enforce the runtime boundary. The
-harness installs the Red Hat Agent Sandbox operator through OLM using channel
-`{agent_sandbox_channel}`.
+provides the gateway and supervisor that enforce the runtime boundary. The raw
+OpenShell install deploys the Red Hat Agent Sandbox operator through OLM using
+channel `{agent_sandbox_channel}`.
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -149,8 +151,9 @@ openshell sandbox create --name {raw_sandbox_name} --no-auto-providers --no-tty 
 ----
 
 Reading the flags: `--no-auto-providers` keeps the sandbox free of inference
-providers (the raw track needs no model credential), `--no-tty` runs it
-non-interactively, and `-- true` is a placeholder command that keeps the
+providers (the raw OpenShell environment needs no model credential),
+`--no-tty` runs it non-interactively, and `-- true` is a placeholder command
+that keeps the
 sandbox alive after startup.
 
 Inspect what was created from both the OpenShell and Kubernetes views:
@@ -235,8 +238,8 @@ endpoints, and gateway pod readiness before changing the gateway registration.
 
 == Exercise 5: Deploy OpenClaw with OpenShell
 
-So far the raw track has used agent-neutral sandboxes. Deploy the OpenClaw
-runtime on the same gateway to see the agent boundary:
+So far the raw OpenShell environment has used agent-neutral sandboxes. Deploy
+the OpenClaw runtime on the same gateway to see the agent boundary:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -293,7 +296,7 @@ Before continuing, verify that you can identify:
 
 * Which cluster-scoped dependency must exist before the Helm chart can create
   sandboxes?
-* Which SCC the harness uses and which workload receives it.
+* Which SCC the raw OpenShell install uses and which workload receives it.
 * Where is the gateway's SQLite state stored?
 * Which operations are performed by the OpenShell CLI rather than raw `oc`?
 * Where does OpenClaw run in this module, and what does it still lack?
@@ -304,7 +307,8 @@ Before continuing, verify that you can identify:
 * The Agent Sandbox controller (the `sandboxes.agents.x-k8s.io` `Sandbox` CRD,
   installed by the Red Hat Agent Sandbox operator) must exist before the Helm
   chart can create sandboxes.
-* The harness grants the `privileged` SCC to the `openshell-sandbox`
+* The raw OpenShell install grants the `privileged` SCC to the
+  `openshell-sandbox`
   ServiceAccount; sandbox pods receive it, the gateway pod does not.
 * Gateway state is stored in the 1Gi `openshell-data-openshell-0` PVC mounted by
   the `openshell` StatefulSet (its SQLite database).

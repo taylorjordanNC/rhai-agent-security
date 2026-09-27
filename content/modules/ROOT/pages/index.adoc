@@ -29,7 +29,7 @@ The workshop progresses through these tasks:
 . Investigate a payments outage with the governance-scoped agent fleet.
 . Deploy a NeMo Guardrails server on OpenShift AI, prove rails block sensitive
   input before the model call, and wire a client application.
-. Attempt the security CTF challenges against the raw track.
+. Attempt the security CTF challenges against the raw OpenShell sandbox environment.
 
 == Learning objectives
 
@@ -74,11 +74,11 @@ Dependencies, so you can enter where your time allows:
   Module 3 prework before class.
 * Modules 5 and 6 require Module 4 (gateway configured, SAW validated).
 * The capstone (Module 7) requires SAW and Module 4's client configuration
-  only — the raw-track modules (1-2) are not a prerequisite, so
+  only — the raw OpenShell modules (1-2) are not a prerequisite, so
   time-constrained participants can jump straight to it.
 * Module 8 (guardrails) is fully standalone — it needs only the OpenShift AI
   foundation and an API key.
-* The Security CTF requires Modules 1-2 (it challenges the raw-track controls).
+* The Security CTF requires Modules 1-2 (it challenges the raw OpenShell controls).
 
 == Workshop map
 
@@ -126,7 +126,7 @@ Dependencies, so you can enter where your time allows:
 | 75 min
 
 | 9. Security CTF
-| Apply every raw-track control layer against timed challenges.
+| Apply every raw OpenShell control layer against timed challenges.
 | 30 min
 |===
 

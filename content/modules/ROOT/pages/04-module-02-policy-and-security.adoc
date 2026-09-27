@@ -301,7 +301,7 @@ the workload keeps running, verify the result, then restore known-good state.
 
 Use a precise live update to add a temporary read-write REST endpoint while the
 sandbox remains running. The target is the in-cluster `http-echo` service the
-harness deploys, so no external host is required:
+raw OpenShell environment deploys, so no external host is required:
 
 [source,bash,role="execute",subs="attributes+"]
 ----

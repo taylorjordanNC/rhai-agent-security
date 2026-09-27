@@ -42,7 +42,7 @@ and its CRDs only after confirming that no other workload depends on them:
 
 [source,bash]
 ----
-bash automation/harness/01-basic-openshell/teardown.sh --crd
+bash automation/openshell-env/teardown.sh --crd
 ----
 
 == Remove a self-deployed Secure Agent Workspace

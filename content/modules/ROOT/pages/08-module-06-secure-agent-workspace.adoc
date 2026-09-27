@@ -8,7 +8,8 @@ list components.
 
 == Technical context
 
-The raw harness and SAW are not equivalent deployment shapes. The harness makes
+The raw OpenShell sandbox environment and SAW are not equivalent deployment
+shapes. The raw OpenShell environment makes
 OpenShell policy behavior directly observable in a sandbox pod. This SAW fork
 adds a dedicated VM for the configured workspace owner and places OpenShell and
 the agent runtime inside it. The VM contains a larger runtime boundary, while
