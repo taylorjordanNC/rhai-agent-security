@@ -28,13 +28,14 @@ cp ~/git/{saw_repo_dir}/values-secret.yaml.template ~/values-secret.yaml
 cd ~/git/{saw_repo_dir} && make generate-keys
 ----
 
-OpenShift-GitOps / ArgoCD must be enabled in the OpenShift cluster. Point each cluster's Argo CD at the workshop root — either the RHDP order's
-gitops path targets `automation/argocd/apps` (the order creates the root), or
-apply the shipped root once:
+OpenShift-GitOps / ArgoCD must be enabled in the OpenShift cluster. On RHDP
+orders the order's gitops path deploys the workshop chart
+(`{automation_repo}/argocd`), whose template creates the `module-7-prereqs`
+child directly. On a cluster without the order pointer, apply the child once:
 
 [source,bash,subs="attributes+"]
 ----
-oc apply -f {automation_repo}/argocd/root.yaml
+make -C {automation_repo} capstone-bootstrap
 ----
 
 [CAUTION]
@@ -44,12 +45,28 @@ SAW setup themselves: a fleet-provisioned environment means Module 3 is
 already done, and the class loses that manual experience.
 ====
 
-Fill `clusters.csv` from the RHDP orders (gitignored — never commit it), then
-install SAW per cluster:
+Fill `clusters.csv` from the RHDP orders (gitignored — never commit it) —
+even for a single cluster: one row is the only credential source, and
+`fleet-status.sh` reads the same file:
 
 [source,bash,subs="attributes+"]
 ----
 cp {automation_repo}/fleet/clusters.csv.example {automation_repo}/fleet/clusters.csv
+----
+
+Bootstrap one cluster by name — installs and blocks until `module-7-prereqs`
+is Synced/Healthy, so participants may proceed the moment it returns
+(~50-70 min). No `--jobs` needed:
+
+[source,bash,subs="attributes+"]
+----
+./{automation_repo}/fleet/fleet-install.sh --only workshop-01
+----
+
+For a large order, fan out across the fleet:
+
+[source,bash,subs="attributes+"]
+----
 ./{automation_repo}/fleet/fleet-install.sh --jobs 5
 ----
 
@@ -74,6 +91,15 @@ Shows Argo CD Application sync/health, the SAW VM phase, the setup Job, and
 the workshop namespaces per cluster. Any cluster whose Applications are not
 Healthy or whose VM is not Running needs attention before class; use the
 installation diagnostics in xref:05-module-03-deploy-secure-agent-workspace.adoc[Module 3].
+
+For a single cluster, poll just the current `oc` context with
+`fleet-status.sh --current`. Before participants arrive, gate the whole
+fleet — it exits non-zero if any cluster is not ready:
+
+[source,bash]
+----
+./{automation_repo}/fleet/fleet-status.sh --gate
+----
 
 == Day of class
 

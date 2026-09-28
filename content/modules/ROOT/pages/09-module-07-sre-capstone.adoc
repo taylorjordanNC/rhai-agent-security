@@ -90,15 +90,14 @@ Gauge, Trace, Probe, Sage), scaled to three agents for this environment.
 
 == Extension prerequisites
 
-The capstone environment is **Argo-managed from this repository** (the
-`rhai-agent-security` repository root): the workshop root app-of-apps
-(`{gitops_root}/`) brings the demo shop, the MLflow instance, the
-telemetry proxy, the incident console, and the planted incident data up as
-the `module-7-prereqs` child in the cluster's `{gitops_namespace}` instance.
-On GitOps-provisioned clusters (RHDP orders) the root is already applied;
-otherwise the facilitator applies it once — before or after the SAW
-deployment, since the child holds in retry until SAW (module 6) and the
-MLflow operator are healthy:
+The capstone environment is **Argo-managed from this repository**: the
+workshop GitOps chart (`{gitops_root}/`) brings the demo shop, the MLflow
+instance, the telemetry proxy, the incident console, and the planted
+incident data up as the `module-7-prereqs` child in the cluster's
+`{gitops_namespace}` instance. On GitOps-provisioned clusters (RHDP orders)
+the order's chart deploys it; otherwise the facilitator applies it once —
+before or after the SAW deployment, since the child holds in retry until SAW
+(module 6) and the MLflow operator are healthy:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -108,7 +107,7 @@ oc get application module-7-prereqs -n {gitops_namespace}   # Synced, then Healt
 
 NOTE: The DataScienceCluster that deploys RHOAI's components (the MLflow
 operator among them) is GitOps-managed here too:
-`{gitops_root}/dsc.yaml`, synced as part of `module-7-prereqs`. To customize
+`{gitops_root}/capstone/dsc.yaml`, synced as part of `module-7-prereqs`. To customize
 your RHOAI deployment — enable or remove components — edit the
 `managementState` entries in that file (`Managed` deploys the component,
 `Removed` tears it down), commit and push, and Argo's self-heal reconciles

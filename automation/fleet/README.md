@@ -10,12 +10,12 @@ fork logic.
 
 | Path | What | Where |
 |---|---|---|
-| RHDP order gitops path | workshop prerequisites (capstone child) | `../argocd/apps` — the order points Argo at that path |
+| RHDP order gitops path | workshop prerequisites (capstone child) | `../argocd` — the order deploys the workshop chart |
 | Fleet script (this dir) | SAW install per cluster | `fleet-install.sh` |
 | Manual (module 3) | participant-run SAW install | the SAW fork's documented procedure |
 
-The workshop root app-of-apps works in any order: apply the RHDP pointer at
-order time and the capstone child retries until this script has installed
+The workshop GitOps (RHDP chart) works in any order: the order deploys the
+capstone child at order time and it retries until this script has installed
 SAW on the cluster.
 
 ## One-time setup (shared across all clusters)
@@ -45,11 +45,20 @@ and keep it off shared hosts.
 
 ```bash
 ./fleet-install.sh                       # sequential, apply-and-move-on
+./fleet-install.sh --only workshop-01    # bootstrap ONE cluster (facilitator
+                                         # remedy): install, then block until the
+                                         # module-7-prereqs Application is
+                                         # Synced/Healthy — participants proceed
+                                         # the moment it returns
 ./fleet-install.sh --jobs 5              # 5 parallel workers
 ./fleet-install.sh --wait                # block per cluster until the setup Job completes
 ./fleet-install.sh --no-emulation        # KVM-capable clusters only
 ./fleet-install.sh --dry-run             # print the plan, change nothing
 ```
+
+Even a single cluster goes through `clusters.csv`: `--only NAME` matches the
+`name` column (exactly one row required), and `fleet-status.sh` reads the
+same file.
 
 Per cluster the script runs the fork's documented steps, in order:
 `make copy-images` → `./pattern.sh make install` → HCO software-emulation
