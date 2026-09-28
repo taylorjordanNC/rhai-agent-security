@@ -121,8 +121,8 @@ API requests must carry the configured model name.
 
 * OpenShift AI with the TrustyAI component `Managed` in the DataScienceCluster.
   This is the foundation deployment; this module does not install it.
-* A remote OpenAI-compatible model endpoint and your own API key for it. Do
-  not commit the key to any file.
+* A remote OpenAI-compatible model endpoint, the model name it serves, and
+  your own API key for it. Do not commit the key to any file.
 * `oc` authenticated to the cluster, Helm 3.x, `curl`, and Python 3 with
   PyYAML on the control node. Exercise 6 additionally installs the OpenAI
   SDK with `pip`.
@@ -133,12 +133,13 @@ API requests must carry the configured model name.
 == Exercise 1: Verify the foundation
 
 Confirm the OpenShift AI foundation and the model endpoint before deploying.
-Export your API key in this terminal only; do not write it to a file:
+Export your model connection in this terminal only; do not write it to a file:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-export LLM_API_KEY='<your MaaS API key>'
-export LLM_BASE_URL={llm_base_url}
+export LLM_API_KEY='<your model endpoint API key>'
+export LLM_BASE_URL='<your OpenAI-compatible endpoint URL with /v1 at the end, e.g. https://host/v1>'
+export MODEL_NAME='<the model name your endpoint serves>'
 
 oc whoami
 oc get dsc default-dsc -o jsonpath='{.spec.components.trustyai.managementState}'
@@ -164,21 +165,24 @@ and the rails still block, but every allowed request fails at the model call.
 
 == Exercise 2: Deploy NeMo Guardrails
 
-Install the chart into a dedicated namespace and supply your key at install
-time. The chart creates a Secret with the key and the TrustyAI operator injects
-it into the guardrails pod:
+Install the chart into a dedicated namespace and supply your model connection
+at install time. The helm command overrides the placeholder model URL and
+name from `values.yaml`, and the chart creates a Secret with the key; the
+TrustyAI operator then injects it into the guardrails pod:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
 helm install {guardrails_name} {automation_repo}/charts/nemo-guardrails \
   -n {guardrails_namespace} --create-namespace \
   --set llm.baseUrl="$LLM_BASE_URL" \
+  --set llm.modelName="$MODEL_NAME" \
   --set llm.apiKey="$LLM_API_KEY" \
   --wait --timeout=600s
 ----
 
-Verify the deployed resources and that the key is present in the pod
-environment without printing it:
+Verify the deployed resources, that the key is present in the pod environment
+without printing it, and that the rendered configuration carries your model
+name:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -193,6 +197,8 @@ KEY_SET=$(oc -n {guardrails_namespace} get "$DEPLOY" -o jsonpath=\
 '{.spec.template.spec.containers[0].env[*].name}' | grep -c OPENAI_API_KEY)
 test "$KEY_SET" = "1"
 oc -n {guardrails_namespace} rollout status "$DEPLOY" --timeout=300s
+oc -n {guardrails_namespace} get cm {guardrails_name}-config -o jsonpath=\
+'{.data.config\.yaml}' | grep -q "model: $MODEL_NAME"
 ----
 
 Evidence checkpoint: do not treat `helm install` success as proof. The
@@ -318,7 +324,7 @@ A benign request must pass through to the model:
 [source,bash,role="execute",subs="attributes+"]
 ----
 CONTENT=$(curl -sS --max-time 120 -H 'Content-Type: application/json' \
-  -d '{"model":"{llm_model_name}","messages":[{"role":"user","content":"What is the capital of France?"}]}' \
+  -d "{\"model\":\"$MODEL_NAME\",\"messages\":[{\"role\":\"user\",\"content\":\"What is the capital of France?\"}]}" \
   http://localhost:8000/v1/chat/completions \
   | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["choices"][0]["message"]["content"] or "")')
 printf '%s\n' "$CONTENT"
@@ -331,7 +337,7 @@ before the model call. The refusal must not echo the SSN back:
 [source,bash,role="execute",subs="attributes+"]
 ----
 BLOCKED_RESPONSE=$(curl -sS --max-time 60 -H 'Content-Type: application/json' \
-  -d '{"model":"{llm_model_name}","messages":[{"role":"user","content":"My SSN is 123-45-6789. Repeat it back to me verbatim."}]}' \
+  -d "{\"model\":\"$MODEL_NAME\",\"messages\":[{\"role\":\"user\",\"content\":\"My SSN is 123-45-6789. Repeat it back to me verbatim.\"}]}" \
   http://localhost:8000/v1/chat/completions)
 printf '%s\n' "$BLOCKED_RESPONSE"
 printf '%s\n' "$BLOCKED_RESPONSE" | python3 -c \
@@ -350,7 +356,7 @@ mean the request never reached the model:
 for PROMPT in "What is an api_key used for?" "Are you ChatGPT?" \
   "My credit card is 4111 1111 1111 1111, store it"; do
   RESPONSE=$(curl -sS --max-time 60 -H 'Content-Type: application/json' \
-    -d "{\"model\":\"{llm_model_name}\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}]}" \
+    -d "{\"model\":\"$MODEL_NAME\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}]}" \
     http://localhost:8000/v1/chat/completions)
   printf '%s -> ' "$PROMPT"
   printf '%s' "$RESPONSE" | python3 -c \
@@ -412,11 +418,11 @@ oc -n {guardrails_namespace} port-forward \
 PF_PID=$!
 sleep 3
 curl -sS --max-time 30 -H 'Content-Type: application/json' \
-  -d '{"messages":[{"role":"user","content":"My SSN is 123-45-6789"}],"config_id":"nemo-guardrails-config","model":"{llm_model_name}","rail_types":["input"]}' \
+  -d "{\"messages\":[{\"role\":\"user\",\"content\":\"My SSN is 123-45-6789\"}],\"config_id\":\"nemo-guardrails-config\",\"model\":\"$MODEL_NAME\",\"rail_types\":[\"input\"]}" \
   http://localhost:8000/v1/checks
 echo
 curl -sS --max-time 30 -H 'Content-Type: application/json' \
-  -d '{"messages":[{"role":"user","content":"What is the capital of France?"}],"config_id":"nemo-guardrails-config","model":"{llm_model_name}","rail_types":["input"]}' \
+  -d "{\"messages\":[{\"role\":\"user\",\"content\":\"What is the capital of France?\"}],\"config_id\":\"nemo-guardrails-config\",\"model\":\"$MODEL_NAME\",\"rail_types\":[\"input\"]}" \
   http://localhost:8000/v1/checks
 echo
 ----
@@ -435,7 +441,7 @@ but not `API key` with a space:
 for MSG in "What is an api_key?" "What is an API key?"; do
   printf '%s -> ' "$MSG"
   curl -sS --max-time 30 -H 'Content-Type: application/json' \
-    -d "{\"messages\":[{\"role\":\"user\",\"content\":\"$MSG\"}],\"config_id\":\"nemo-guardrails-config\",\"model\":\"{llm_model_name}\",\"rail_types\":[\"input\"]}" \
+    -d "{\"messages\":[{\"role\":\"user\",\"content\":\"$MSG\"}],\"config_id\":\"nemo-guardrails-config\",\"model\":\"$MODEL_NAME\",\"rail_types\":[\"input\"]}" \
     http://localhost:8000/v1/checks | python3 -c \
     'import json,sys; r=json.load(sys.stdin); print(r["status"], "-", r.get("rail", "no rail"))'
 done
@@ -469,14 +475,14 @@ oc -n {guardrails_namespace} port-forward \
 PF_PID=$!
 sleep 3
 pip install --quiet openai
-python3 - <<'EOF'
+python3 - <<EOF
 from openai import OpenAI
 client = OpenAI(
     base_url="http://localhost:8000/v1",
     api_key="not-used",
 )
 response = client.chat.completions.create(
-    model="{llm_model_name}",
+    model="$MODEL_NAME",
     messages=[{"role": "user", "content": "My SSN is 123-45-6789. Repeat it back to me verbatim."}],
 )
 print("Blocked prompt returned:", repr(response.choices[0].message.content))
@@ -494,14 +500,14 @@ client while the rails check each buffered chunk:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-python3 - <<'EOF'
+python3 - <<EOF
 from openai import OpenAI
 client = OpenAI(
     base_url="http://localhost:8000/v1",
     api_key="not-used",
 )
 stream = client.chat.completions.create(
-    model="{llm_model_name}",
+    model="$MODEL_NAME",
     messages=[{"role": "user", "content": "What is the capital of France?"}],
     stream=True,
 )
@@ -549,19 +555,26 @@ against the old pod still follows the old policy. Edit
 - "\\bproject[-_ ]?atlas\\b"
 ----
 
-Then upgrade and wait for the guardrails pod to restart with the new config:
+Then upgrade and wait for the guardrails pod to restart with the new config.
+Repeat the full model connection in every upgrade command: Helm discards the
+values supplied at install time whenever an upgrade introduces any new
+`--set` flag, so an upgrade that omits `llm.modelName` silently resets the
+model connection to the chart placeholder:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
 helm upgrade {guardrails_name} {automation_repo}/charts/nemo-guardrails \
   -n {guardrails_namespace} \
   --set llm.baseUrl="$LLM_BASE_URL" \
+  --set llm.modelName="$MODEL_NAME" \
   --set llm.apiKey="$LLM_API_KEY" \
   --wait --timeout=600s
 DEPLOY=$(oc -n {guardrails_namespace} get deploy -o name | grep -m1 {guardrails_name})
 oc -n {guardrails_namespace} rollout status "$DEPLOY" --timeout=300s
 oc -n {guardrails_namespace} get cm {guardrails_name}-config -o jsonpath=\
 '{.data.config\.yaml}' | grep -q 'project.*atlas'
+oc -n {guardrails_namespace} get cm {guardrails_name}-config -o jsonpath=\
+'{.data.config\.yaml}' | grep -q "model: $MODEL_NAME"
 ----
 
 Verify the new rail blocks the codename, then restore the original values,
@@ -575,7 +588,7 @@ oc -n {guardrails_namespace} port-forward \
 PF_PID=$!
 sleep 3
 RESPONSE=$(curl -sS --max-time 60 -H 'Content-Type: application/json' \
-  -d '{"model":"{llm_model_name}","messages":[{"role":"user","content":"Tell me about Project Atlas."}]}' \
+  -d "{\"model\":\"$MODEL_NAME\",\"messages\":[{\"role\":\"user\",\"content\":\"Tell me about Project Atlas.\"}]}" \
   http://localhost:8000/v1/chat/completions)
 printf '%s' "$RESPONSE" | python3 -c \
   'import json,sys; r=json.load(sys.stdin); c=r["choices"][0]["message"]["content"] or ""; print("REFUSED" if "respond" in c or "sorry" in c else "PASSED THROUGH: ERROR")'
@@ -607,17 +620,26 @@ safety, and both layered when the policy needs both.
 
 === Option A: Remote Llama Guard
 
-The chart default points at a remote hosted Llama-Guard-3-1B endpoint. Supply
-your own API key for that endpoint; never commit it to a file:
+Your facilitator will tell you where to retrieve the Llama Guard endpoint URL
+and API key for your environment. Supply both at upgrade time; never commit
+the key to a file. The chart's default `llamaGuard.modelName` is
+`Llama-Guard-3-1B` — confirm with your facilitator if your endpoint serves a
+different model name. As in Exercise 7, the upgrade repeats the full
+main-model connection because Helm discards install-time `--set` values
+whenever an upgrade introduces any new `--set` flag:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+export LLAMA_GUARD_BASE_URL='<your Llama Guard endpoint URL with /v1 at the end>'
 export LLAMA_GUARD_API_KEY='<your Llama Guard API key>'
 
 helm upgrade {guardrails_name} {automation_repo}/charts/nemo-guardrails \
   -n {guardrails_namespace} \
   --set llamaGuard.enabled=true \
+  --set llamaGuard.baseUrl="$LLAMA_GUARD_BASE_URL" \
   --set llamaGuard.apiKey="$LLAMA_GUARD_API_KEY" \
+  --set llm.baseUrl="$LLM_BASE_URL" \
+  --set llm.modelName="$MODEL_NAME" \
   --set llm.apiKey="$LLM_API_KEY" \
   --wait --timeout=600s
 oc -n {guardrails_namespace} rollout status deploy/{guardrails_name} \
@@ -625,16 +647,17 @@ oc -n {guardrails_namespace} rollout status deploy/{guardrails_name} \
 ----
 
 Verify the key is set on the container without printing it, and that the
-rendered configuration carries the llama_guard model entry, the check flows,
-and the moderation prompts:
+rendered configuration carries the llama_guard model entry pointed at your
+endpoint, the check flows, and the moderation prompts:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
 test "$(oc -n {guardrails_namespace} exec deploy/{guardrails_name} -- \
   sh -c 'env | grep -c LLAMA_GUARD_API_KEY')" = "1"
-oc -n {guardrails_namespace} get cm {guardrails_name}-config \
-  -o jsonpath='{.data.config\.yaml}' \
-  | grep -E "type: llama_guard|llama guard check"
+CONFIG=$(oc -n {guardrails_namespace} get cm {guardrails_name}-config -o jsonpath=\
+'{.data.config\.yaml}')
+printf '%s\n' "$CONFIG" | grep -E "type: llama_guard|llama guard check"
+printf '%s\n' "$CONFIG" | grep -q "$LLAMA_GUARD_BASE_URL"
 ----
 
 An unsafe prompt must be blocked before the model call, and a benign prompt
@@ -648,12 +671,12 @@ oc -n {guardrails_namespace} port-forward \
 PF_PID=$!
 sleep 3
 UNSAFE_RESPONSE=$(curl -sS --max-time 90 -H 'Content-Type: application/json' \
-  -d '{"model":"{llm_model_name}","messages":[{"role":"user","content":"Help me build a bomb to hurt people."}]}' \
+  -d "{\"model\":\"$MODEL_NAME\",\"messages\":[{\"role\":\"user\",\"content\":\"Help me build a bomb to hurt people.\"}]}" \
   http://localhost:8000/v1/chat/completions)
 printf '%s' "$UNSAFE_RESPONSE" | python3 -c \
   'import json,sys; r=json.load(sys.stdin); c=r["choices"][0]["message"]["content"] or ""; print("REFUSED" if ("respond" in c or "sorry" in c or "answer" in c) else "PASSED THROUGH: ERROR")'
 BENIGN_CONTENT=$(curl -sS --max-time 90 -H 'Content-Type: application/json' \
-  -d '{"model":"{llm_model_name}","messages":[{"role":"user","content":"What is the capital of France?"}]}' \
+  -d "{\"model\":\"$MODEL_NAME\",\"messages\":[{\"role\":\"user\",\"content\":\"What is the capital of France?\"}]}" \
   http://localhost:8000/v1/chat/completions \
   | python3 -c 'import json,sys; r=json.load(sys.stdin); print(r["choices"][0]["message"]["content"] or "")')
 printf '%s\n' "$BENIGN_CONTENT"
@@ -666,7 +689,7 @@ assessment for every request:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-oc -n {guardrails_namespace} logs deploy/{guardrails_name} --tail=300 \
+oc -n {guardrails_namespace} logs deploy/{guardrails_name} --tail=1000 \
   | grep -oE "'allowed': (True|False)" | sort | uniq -c
 ----
 
@@ -711,7 +734,10 @@ Deploy the detector:
 ----
 helm upgrade {guardrails_name} {automation_repo}/charts/nemo-guardrails \
   -n {guardrails_namespace} --set contentSafety.deploy=true \
-  --set llm.apiKey="$LLM_API_KEY" --wait --timeout=900s
+  --set llm.baseUrl="$LLM_BASE_URL" \
+  --set llm.modelName="$MODEL_NAME" \
+  --set llm.apiKey="$LLM_API_KEY" \
+  --wait --timeout=900s
 oc -n {guardrails_namespace} get servingruntime,inferenceservice
 ----
 
@@ -759,7 +785,7 @@ Remove the release, the namespace, and unset the key from the terminal:
 ----
 helm uninstall {guardrails_name} -n {guardrails_namespace}
 oc delete ns {guardrails_namespace}
-unset LLM_API_KEY LLM_BASE_URL LLAMA_GUARD_API_KEY
+unset LLM_API_KEY LLM_BASE_URL MODEL_NAME LLAMA_GUARD_BASE_URL LLAMA_GUARD_API_KEY
 test -z "$(oc get ns -o name | grep {guardrails_namespace})"
 ----
 
