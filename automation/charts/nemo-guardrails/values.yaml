@@ -55,7 +55,6 @@ config: |
             - "\\b(password|hack|exploit|vulnerability|secret|api[_-]?key|token)\\b"
             - "\\b(violence|illegal|harmful)\\b"
             - "\\b(chatgpt|openai|claude|anthropic)\\b"
-            - "\\b(green\\s*aura|black\\s*aura|rob\\s*aura)\\b"
           case_insensitive: true
         output:
           patterns:
@@ -64,7 +63,6 @@ config: |
             - "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
             - "\\(?\\d{3}\\)?[-.\\s]?\\d{3}[-.\\s]?\\d{4}"
             - "\\b(chatgpt|openai|claude|anthropic)\\b"
-            - "\\b(green\\s*aura|black\\s*aura|rob\\s*aura)\\b"
             - "\\b(confidential|internal[_-]?only|do[_-]?not[_-]?share)\\b"
           case_insensitive: true
       sensitive_data_detection:

@@ -1,0 +1,14 @@
+# Fleet cluster credentials — local only, NEVER commit (gitignored).
+# Copy to clusters.csv and fill in per cluster from the RHDP order.
+#
+# Format: name,server,username,password[,token]
+#   name     short label used in status output
+#   server   cluster API URL (https://api.<cluster>:6443)
+#   username RHDP kubeadmin (or another cluster-admin user)
+#   password login password
+#   token    optional bearer token — when present it takes precedence over
+#            username/password (e.g. for SNOs that only expose tokens)
+#
+name,server,username,password,token
+workshop-01,https://api.cluster-abc123.dyn.redhatworkshops.io:6443,kubeadmin,CHANGE-ME,
+workshop-02,https://api.cluster-def456.dyn.redhatworkshops.io:6443,kubeadmin,CHANGE-ME,sha256~CHANGE-ME

@@ -476,8 +476,8 @@ oc -n openshell logs statefulset/openshell --tail=500 | \
 ```bash
 # The gateway event store keeps OCSF events per sandbox. Denials include the
 # destination, calling binary, engine, and reason (verified):
-openshell --gateway continuum-raw logs policy-lab --since 30s
-openshell --gateway continuum-raw logs policy-lab --level info --since 30s
+openshell --gateway local-gateway logs policy-lab --since 30s
+openshell --gateway local-gateway logs policy-lab --level info --since 30s
 ```
 
 ### Operator, live event stream
@@ -486,7 +486,7 @@ openshell --gateway continuum-raw logs policy-lab --level info --since 30s
 # Interactive TUI streaming OCSF events in real time: sandbox creation,
 # command execution, network policy enforcement (ALLOWED/DENIED).
 # Requires a TTY — verified it errors without one (run in an interactive terminal):
-openshell term --gateway continuum-raw
+openshell term --gateway local-gateway
 ```
 
 ### Aggregate metrics

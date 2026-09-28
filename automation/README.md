@@ -1,11 +1,73 @@
 = Workshop Automation
 
-This directory contains the OpenShift OpenShell evaluation installer and the
-canonical policy used by the workshop.
+This directory contains the raw OpenShell sandbox environment installer, the
+canonical policy used by the workshop, the workshop GitOps app-of-apps (with
+the capstone manifests it deploys), and the fleet SAW deployment scripts.
+
+| Directory | What it holds
+| `openshell-env/` | raw OpenShell sandbox environment scripts: install, verify, teardown, and the sandbox security test
+| `policies/` | the pinned sandbox policies the workshop applies
+| `argocd/` | the workshop GitOps app-of-apps (`root.yaml`, `apps/`) and the capstone manifests it deploys (`capstone/`)
+| `fleet/` | multi-cluster SAW deployment scripts for RHDP orders
+| `bootstrap/` | local CLI install and the pre-flight check
+| `charts/` | the Helm charts modules install (currently `nemo-guardrails`)
 
 Secure Agent Workspace deployment assets are not copied into this directory.
 Follow the workshop instructions from the `saw-emulation-fixes` branch of the
 `taylorjordanNC/secure-agent-workspace` fork.
+
+== Workshop GitOps (app-of-apps)
+
+`argocd/` is the workshop's Argo CD entry point: `argocd/root.yaml` is the
+root app-of-apps Application, `argocd/apps/` holds the child Applications
+it manages (currently `module-7-prereqs`, the Module 7 capstone
+prerequisites), and `argocd/capstone/` is the sync source those Applications
+deploy. The SAW deployment is deliberately *not* a child here — it is
+the SAW fork's Validated Patterns deployment (scripted by `fleet/` or run by
+participants in module 3).
+
+Point Argo at one path per cluster — either the RHDP order's gitops path
+targets `automation/argocd/apps` (the order creates the root), or apply the
+shipped root once:
+
+[source,bash]
+----
+oc apply -f automation/argocd/root.yaml
+----
+
+Pick one pointer per cluster; two roots managing the same children fight over
+ownership. Children that depend on SAW hold in retry until SAW and the RHOAI
+MLflow operator are healthy — no manual re-apply.
+
+The default Argo instance is `openshift-gitops` (the GitOps operator default).
+For a cluster where Argo CD runs elsewhere, swap the namespace in one pass:
+
+[source,bash]
+----
+sed -i.bak 's/namespace: openshift-gitops/namespace: vp-gitops/g' \
+  automation/argocd/root.yaml automation/argocd/apps/*.yaml
+----
+
+If the SAW fork or its Validated Patterns framework changes, update only the
+named knobs (`saw_gitops_namespace` in both Antora `antora.yml` files,
+parity-checked by `npm run validate:docs`) — nothing in the workshop GitOps
+references `vp-gitops` structurally.
+
+== Fleet SAW deployment (RHDP orders)
+
+`fleet/` loops the SAW fork's documented install over a credentials CSV —
+the **SAW as script** path for ~50 RHDP clusters. It calls only the fork's
+entry points (`make copy-images`, `./pattern.sh make install`, the HCO
+emulation loop), so fork updates flow through:
+
+[source,bash]
+----
+./automation/fleet/fleet-install.sh --jobs 5   # 50 clusters ≈ 2-3h
+./automation/fleet/fleet-status.sh             # read-only per-cluster poll
+----
+
+See `fleet/README.md` for the one-time shared assets (fork checkout,
+`values-secret.yaml`, SSH keypair) and the credentials file (gitignored).
 
 == Prerequisites
 
@@ -31,8 +93,8 @@ make -C automation prerequisites
 
 == Raw OpenShell
 
-Install the harness-compatible evaluation gateway, then run the sandbox
-control-layer test after the Modules 1-2 exercises have created the
+Install the raw OpenShell evaluation gateway from `openshell-env/`, then run
+the sandbox control-layer test after the Modules 1-2 exercises have created the
 `policy-lab` sandbox and applied the quickstart policy:
 
 [source,bash]
@@ -41,7 +103,7 @@ make -C automation install-openshell
 make -C automation openshell-security-test
 ----
 
-This path intentionally uses the harness's plaintext, unauthenticated lab
+This path intentionally uses the environment's plaintext, unauthenticated lab
 configuration. It is not the production security posture.
 
 == NeMo Guardrails chart
@@ -84,12 +146,12 @@ content, and verification cannot drift:
 | `openshell_version`, `openshell_saw_version`, and `ocp_version` must agree
   with this repository; `npm run validate:docs` enforces the parity
 
-| `automation/harness/01-basic-openshell/verify.sh`
+| `automation/openshell-env/verify.sh`
 | The `OPENSHELL_VERSION` fallback default used when the script runs outside
   `make openshell-verify`
 
 | `automation/README.md` and
-  `automation/harness/01-basic-openshell/README.md`
+  `automation/openshell-env/README.md`
 | The pinned version named in the prerequisites text
 |===
 

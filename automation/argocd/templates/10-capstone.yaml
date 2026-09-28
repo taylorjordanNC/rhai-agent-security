@@ -1,0 +1,84 @@
+# Module 7 capstone prerequisites — Argo CD child Application.
+#
+# Managed by the workshop root app-of-apps (automation/argocd/root.yaml): the
+# RHDP order's gitops path or a one-time `oc apply -f root.yaml` creates the
+# root, which then creates this child from this directory. To manage it
+# directly without the root:
+#
+#   oc apply -f automation/argocd/apps/10-capstone.yaml
+#
+# The Application watches this repository's automation/argocd/capstone
+# directory. Sync waves order the components: openshell namespace (0), demo
+# shop (0), MLflow instance (1), telemetry proxy (2, needs openshell-agents
+# from the SAW deployment), incident console (3), seed RBAC (4). A PostSync
+# hook Job plants the incident-story traces after everything is healthy,
+# re-running idempotently on each sync.
+#
+# The capstone runtime depends on the SAW deployment (module 3, optional):
+# the telemetry proxy lands in openshell-agents and the seed Job in openshell.
+# Automated sync + retry holds this child in retry until SAW and the RHOAI
+# MLflow operator are healthy — no manual re-apply.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: module-7-prereqs
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/taylorjordanNC/rhai-agent-security.git
+    targetRevision: main
+    path: automation/argocd/capstone
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo
+  ignoreDifferences:
+    # The incident console scales the shop to 0/2 during Exercise 4 — that is
+    # intentional drift, so Argo must not self-heal (revert) the replica count.
+    - group: apps
+      kind: Deployment
+      name: shop
+      namespace: demo
+      jsonPointers: ["/spec/replicas"]
+    # RHOAI OLM objects are declared in parity with the SAW fork's
+    # values-prod (see capstone/50-rhods-operator.yaml): the workshop pre-sets
+    # them, the SAW pattern adopts them identically. The SAW chart injects its
+    # tracking-id annotation and controllers inject SCC/PSA annotations into
+    # these objects — this child reconciles spec fields only, so annotation
+    # diffs are ignored to avoid churn between the two self-healing managers.
+    # RespectIgnoreDifferences (below) keeps those annotations on apply.
+    - group: operators.coreos.com
+      kind: Subscription
+      jsonPointers: ["/metadata/annotations"]
+    - group: operators.coreos.com
+      kind: OperatorGroup
+      jsonPointers: ["/metadata/annotations"]
+    - group: ""
+      kind: Namespace
+      name: redhat-ods-operator
+      jsonPointers: ["/metadata/annotations"]
+    # openshell-agents is declared in parity with the SAW fork's values-prod
+    # (see capstone/05-openshell-agents-namespace.yaml): the workshop creates
+    # it at wave 0 so the PreSync mirror hooks succeed on a fresh cluster,
+    # the SAW pattern adopts it identically. The SAW chart injects
+    # managed-by/pod-security labels and controllers inject SCC annotations
+    # — ignore both to avoid churn between the two self-healing managers.
+    - group: ""
+      kind: Namespace
+      name: openshell-agents
+      jsonPointers: ["/metadata/annotations", "/metadata/labels"]
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - Validate=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 3m

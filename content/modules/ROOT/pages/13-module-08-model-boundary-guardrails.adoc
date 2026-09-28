@@ -12,7 +12,7 @@ OpenAI-compatible proxy in front of the model. Clients call the guardrails
 server, not the model. Input rails run before the model call, output rails run
 on the response, and the model credential never reaches the caller.
 
-*Estimated time:* 55-65 minutes
+*Estimated time:* 70-80 minutes
 
 == Technical context
 
@@ -200,6 +200,12 @@ Evidence checkpoint: do not treat `helm install` success as proof. The
 `OPENAI_API_KEY` environment variable must be set on the container. If the pod
 restarts repeatedly, check `oc -n {guardrails_namespace} logs` for a missing
 Presidio dependency (see the caveat in Exercise 3).
+
+GUI view: open the OpenShift Console tab and navigate to Workloads >
+Deployments in the `{guardrails_namespace}` project. The operator-rendered
+Deployment appears there — the visual reminder of the ownership split above:
+desired state lives in the CR you edit; the Deployment is the operator's
+rendering of it.
 
 === What the operator did
 
@@ -452,10 +458,16 @@ is OpenAI-compatible, so any existing OpenAI client works by changing the
 base URL — the application code gains rails without changing how it calls the
 model.
 
-Install the OpenAI SDK and wire a minimal client to the forwarded port:
+Restore the port-forward that Exercise 5 stopped, then install the OpenAI SDK
+and wire a minimal client to the forwarded port:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+oc -n {guardrails_namespace} port-forward \
+  "$(oc -n {guardrails_namespace} get svc -o name | grep -m1 {guardrails_name})" \
+  8000:"$PORT" >/tmp/guardrails-pf.log 2>&1 &
+PF_PID=$!
+sleep 3
 pip install --quiet openai
 python3 - <<'EOF'
 from openai import OpenAI
@@ -771,3 +783,5 @@ test -z "$(oc get ns -o name | grep {guardrails_namespace})"
 * The `nemo-guardrails` chart README documents the API key values, the
   Secret injection behavior, and how to escape Go template syntax when
   pasting custom configs.
+
+When finished, continue to xref:11-cleanup.adoc[Cleanup] to remove the environment.

@@ -1,0 +1,60 @@
+# Module 7 prerequisite: the DataScienceCluster that deploys the RHOAI
+# components this workshop needs (the MLflow operator among them). Sync
+# wave 0 — before the MLflow CR (wave 1), which requires the
+# mlflow.opendatahub.io/MLflow CRD the mlflowoperator component registers.
+# Without a DSC the rhods-operator CSV installs but deploys nothing: the
+# operator only reconciles the components enabled under spec.components.
+# To customize what RHOAI deploys (enable or remove components), edit the
+# managementState entries below — see Module 7, Extension prerequisites.
+# SkipDryRunOnMissingResource: the CRD arrives with the rhods-operator
+# subscription, so Argo must not dry-run this before it lands.
+apiVersion: datasciencecluster.opendatahub.io/v2
+kind: DataScienceCluster
+metadata:
+  name: default-dsc
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/sync-wave: "0"
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  components:
+    aipipelines:
+      managementState: Managed
+    dashboard:
+      managementState: Managed
+    feastoperator:
+      managementState: Managed
+    kserve:
+      managementState: Managed
+      modelsAsService:
+        managementState: Removed
+      nim:
+        managementState: Managed
+      rawDeploymentServiceConfig: Headed
+    kueue:
+      defaultClusterQueueName: default
+      defaultLocalQueueName: default
+      managementState: Removed
+    llamastackoperator:
+      managementState: Managed
+    mlflowoperator:
+      managementState: Managed
+    modelregistry:
+      managementState: Managed
+      registriesNamespace: rhoai-model-registries
+    ray:
+      managementState: Managed
+    trainer:
+      managementState: Removed
+    trainingoperator:
+      managementState: Managed
+    trustyai:
+      eval:
+        lmeval:
+          permitCodeExecution: deny
+          permitOnline: deny
+      managementState: Managed
+    workbenches:
+      managementState: Managed
+      workbenchNamespace: rhods-notebooks

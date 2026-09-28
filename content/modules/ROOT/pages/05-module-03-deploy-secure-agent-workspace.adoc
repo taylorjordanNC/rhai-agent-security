@@ -1,9 +1,12 @@
-= Module 3 (Optional): Install Secure Agent Workspace
-:navtitle: Optional SAW Installation
+= Module 3: Prework — Install Secure Agent Workspace
+:navtitle: SAW Prework
 
-This optional module installs Secure Agent Workspace (SAW) on the OpenShift
-cluster. Skip it when the facilitator provides an existing SAW environment and
-continue with xref:06-module-04-create-openclaw-agent.adoc[Module 4].
+This module installs Secure Agent Workspace (SAW) on the OpenShift
+cluster. Skip this module when the facilitator has deployed
+SAW with the fleet install script for the workshop. Either way, a running SAW environment is
+core-track preparation:
+xref:06-module-04-create-openclaw-agent.adoc[Module 4], where the core track
+picks up SAW, assumes the environment is already up.
 
 include::secure-agent-workspace:ROOT:partial$deployment/scope.adoc[]
 
@@ -11,13 +14,10 @@ The operational sections below are included from that fork's canonical
 deployment guide. Update the shared partials in the SAW repository when a
 deployment command changes; do not duplicate the procedure in this repository.
 
-*Estimated time:* 90-150 minutes, depending on operator installation, image
-imports, storage, and VM startup. Run this module as prework when class time is
-limited.
-
 == Deployment scope
 
-The raw harness and SAW deployment are separate environments. This installation
+The raw OpenShell sandbox environment and SAW deployment are separate
+environments. This installation
 adds a KubeVirt VM for the configured workspace owner, an OpenShell gateway and
 container runtime inside that VM, Keycloak OIDC, Vault and External Secrets, a
 governance interceptor, and GitOps-managed configuration.

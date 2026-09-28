@@ -1,0 +1,13 @@
+gitops:
+  repoURL: https://github.com/taylorjordanNC/rhai-agent-security.git
+  revision: main
+  basePath: automation/argocd
+
+deployer:
+  domain: ""
+  apiUrl: ""
+
+guid: ""
+
+fieldContent:
+  deploymentType: helm

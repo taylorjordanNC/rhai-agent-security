@@ -1,0 +1,290 @@
+# Module 7 prerequisite: the browser incident console — shows the demo shop's
+# health and performs the scale-to-zero / restore actions on human command.
+# RBAC is scoped to the demo namespace only. The console's confirmation is
+# not durable, identity-bound approval evidence — a production workflow needs
+# an authenticated approval record and a controlled delivery path such as a
+# reviewed Git change reconciled by Argo CD.
+# Sync wave 3 — after the demo namespace exists (wave 0).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: incident-console
+  namespace: openshell-agents
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/sync-wave: "3"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: incident-console
+  namespace: demo
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/sync-wave: "3"
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "deployments/scale"]
+    verbs: ["get", "list", "patch"]
+  - apiGroups: [""]
+    resources: ["pods", "events"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: incident-console
+  namespace: demo
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/sync-wave: "3"
+subjects:
+  - kind: ServiceAccount
+    name: incident-console
+    namespace: openshell-agents
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: incident-console
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: incident-console-code
+  namespace: openshell-agents
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/sync-wave: "3"
+data:
+  console.py: |
+    #!/usr/bin/env python3
+    """Incident console for the SRE copilot capstone fleet.
+
+    Shows the demo shop's health and performs the scale-to-zero / restore
+    actions on human command. The agents recommend; this UI is how the human
+    confirms. The confirmation is not durable, identity-bound approval
+    evidence -- a production workflow needs an authenticated approval record
+    and a controlled delivery path such as a reviewed Git change reconciled
+    by Argo CD.
+    """
+    import json
+    import ssl
+    import urllib.request
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    API = "https://kubernetes.default.svc"
+    NS = "demo"
+    DEPLOYMENT = "shop"
+
+
+    def k8s(method, path, body=None):
+        token = open("/var/run/secrets/kubernetes.io/serviceaccount/token").read()
+        ca = ssl.create_default_context(
+            cafile="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+        req = urllib.request.Request(API + path, method=method)
+        req.add_header("Authorization", f"Bearer {token}")
+        data = None
+        if body is not None:
+            data = json.dumps(body).encode()
+            req.add_header("Content-Type", "application/merge-patch+json")
+        try:
+            with urllib.request.urlopen(req, data=data, context=ca, timeout=10) as r:
+                return json.loads(r.read().decode() or "{}"), None
+        except urllib.error.HTTPError as err:
+            return {}, f"HTTP {err.code}: {err.read().decode()[:200]}"
+        except Exception as err:  # noqa: BLE001
+            return {}, str(err)
+
+
+    def status():
+        dep, err = k8s(
+            "GET", f"/apis/apps/v1/namespaces/{NS}/deployments/{DEPLOYMENT}")
+        if err:
+            return {"error": err, "replicas": None, "pods": [], "events": []}
+        pods, _ = k8s("GET", f"/api/v1/namespaces/{NS}/pods?labelSelector=app={DEPLOYMENT}")
+        events, _ = k8s("GET", f"/api/v1/namespaces/{NS}/events?sortField=lastTimestamp&sortDesc=true&limit=6")
+        pod_list = [
+            {"name": p["metadata"]["name"], "phase": p["status"].get("phase", "?")}
+            for p in pods.get("items", [])
+        ]
+        ev = [
+            {
+                "reason": e.get("reason", "?"),
+                "message": (e.get("message") or "")[:120],
+                "object": e.get("involvedObject", {}).get("name", ""),
+            }
+            for e in events.get("items", [])
+        ]
+        return {
+            "replicas": dep["spec"].get("replicas"),
+            "ready": dep["status"].get("readyReplicas", 0),
+            "unavailable": dep["status"].get("unavailableReplicas", 0),
+            "pods": pod_list,
+            "events": ev,
+        }
+
+
+    def scale(replicas):
+        _, err = k8s(
+            "PATCH", f"/apis/apps/v1/namespaces/{NS}/deployments/{DEPLOYMENT}/scale",
+            {"spec": {"replicas": replicas}},
+        )
+        return err
+
+
+    class Handler(BaseHTTPRequestHandler):
+        def _send(self, code, body, ctype="application/json"):
+            payload = body.encode() if isinstance(body, str) else body
+            self.send_response(code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def do_GET(self):
+            if self.path.startswith("/api/status"):
+                self._send(200, json.dumps(status()))
+            elif self.path.startswith("/api/scale"):
+                self._send(405, json.dumps({"error": "use POST"}))
+            else:
+                self._send(200, PAGE, "text/html")
+
+        def do_POST(self):
+            if self.path.startswith("/api/scale"):
+                length = int(self.headers.get("Content-Length", 0))
+                try:
+                    replicas = int(json.loads(self.rfile.read(length).decode())["replicas"])
+                except Exception:  # noqa: BLE001
+                    self._send(400, json.dumps({"error": "invalid body"}))
+                    return
+                if replicas not in (0, 2):
+                    self._send(400, json.dumps({"error": "replicas must be 0 or 2"}))
+                    return
+                err = scale(replicas)
+                self._send(200 if not err else 500,
+                           json.dumps({"ok": not err, "error": err, "status": status()}))
+            else:
+                self._send(404, json.dumps({"error": "not found"}))
+
+        def log_message(self, *args):
+            pass
+
+
+    PAGE = """<!doctype html>
+    <html><head><title>Incident Console — demo shop</title>
+    <style>
+     body { font-family: system-ui, sans-serif; background: #14161a; color: #e8e8e8;
+            margin: 2rem; }
+     h1 { font-size: 1.4rem; }
+     .card { background: #1e2128; border-radius: 10px; padding: 1rem 1.25rem;
+             margin: 1rem 0; border: 1px solid #2c3038; }
+     .big { font-size: 2.2rem; font-weight: 700; }
+     .ok { color: #4ade80; } .bad { color: #f87171; }
+     button { font-size: 1rem; padding: .6rem 1.2rem; border-radius: 8px;
+              border: 1px solid #444; background: #2c3038; color: #e8e8e8;
+              cursor: pointer; margin-right: .6rem; }
+     button:hover { background: #3a3f4a; }
+     .ev { font-family: ui-monospace, monospace; font-size: .8rem; color: #aaa;
+           margin: .2rem 0; }
+     #health { transition: color .3s; }
+    </style></head>
+    <body>
+    <h1>Incident Console — <code>demo/shop</code></h1>
+    <div class="card">
+      <div>Ready replicas: <span class="big" id="health">…</span></div>
+      <div id="detail"></div>
+    </div>
+    <div class="card">
+      <button onclick="scale(0)">Inject outage (scale to 0)</button>
+      <button onclick="scale(2)">Restore service (scale to 2)</button>
+      <span id="msg"></span>
+    </div>
+    <div class="card"><h3>Recent events</h3><div id="events"></div></div>
+    <script>
+    async function refresh() {
+      const s = await (await fetch('/api/status')).json();
+      const h = document.getElementById('health');
+      h.textContent = s.ready ?? '?';
+      h.className = 'big ' + ((s.ready ?? 0) > 0 ? 'ok' : 'bad');
+      document.getElementById('detail').textContent =
+        `desired=${s.replicas}  unavailable=${s.unavailable ?? 0}`;
+      document.getElementById('events').innerHTML =
+        (s.events || []).map(e => `<div class="ev">${e.reason} — ${e.object}: ${e.message}</div>`).join('');
+    }
+    async function scale(replicas) {
+      const r = await (await fetch('/api/scale', {method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({replicas})})).json();
+      document.getElementById('msg').textContent = r.error || 'applied';
+      refresh();
+    }
+    refresh(); setInterval(refresh, 4000);
+    </script></body></html>"""
+
+    if __name__ == "__main__":
+        ThreadingHTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: incident-console
+  namespace: openshell-agents
+  labels:
+    app: incident-console
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: incident-console }
+  template:
+    metadata:
+      labels: { app: incident-console }
+    spec:
+      serviceAccountName: incident-console
+      containers:
+        - name: console
+          image: python:3.12-alpine
+          command: ["python", "/app/console.py"]
+          ports: [{ containerPort: 8080 }]
+          resources:
+            requests: { cpu: 25m, memory: 48Mi }
+            limits: { memory: 128Mi }
+          volumeMounts:
+            - { mountPath: /app, name: code }
+      volumes:
+        - name: code
+          configMap: { name: incident-console-code }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: incident-console
+  namespace: openshell-agents
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  selector: { app: incident-console }
+  ports:
+    - { name: http, port: 8080, protocol: TCP, targetPort: 8080 }
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: incident-console
+  namespace: openshell-agents
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  to:
+    kind: Service
+    name: incident-console
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None

@@ -19,15 +19,16 @@ The workshop progresses through these tasks:
 . Deploy OpenClaw on the raw pod boundary and inspect its runtime.
 . Apply policy changes, test allowed and denied behavior, and correlate runtime
   evidence.
-. Optionally install SAW with OpenShift Virtualization, OIDC, external secrets,
+. Install SAW as prework — or use an environment the facilitator deployed with the fleet install script — so the in-class core track stays short: OpenShift Virtualization, OIDC, external secrets,
   and GitOps governance.
 . Configure and validate an existing SAW deployment, regardless of who installed
   it.
 . Run OpenClaw through the SAW NemoClaw path and inspect its effective controls.
 . Inspect identity, secret delivery, VM isolation, and GitOps ownership in the
   deployed environment.
-. Optionally complete the separately provisioned SRE incident extension.
-. Optionally attempt the security CTF challenges against the raw track.
+. Investigate a payments outage with the governance-scoped agent fleet.
+. Deploy a NeMo Guardrails server on OpenShift AI, prove rails block sensitive
+  input before the model call, and wire a client application.
 
 == Learning objectives
 
@@ -40,6 +41,8 @@ By the end of the workshop you will be able to:
 * Validate the VM, identity, secret, workspace, and GitOps resources in SAW.
 * Run OpenClaw through the SAW-managed NemoClaw path without exposing the
   inference credential to the sandbox.
+* Deploy a NeMo Guardrails server on OpenShift AI and distinguish the runtime
+  sandbox boundary from the model boundary.
 * Collect evidence that supports or limits a security claim.
 
 == How to run the workshop
@@ -47,7 +50,35 @@ By the end of the workshop you will be able to:
 Each exercise identifies the state to change, the evidence to inspect, and the
 result that must be verified. Do not treat command completion as proof. Compare
 the observed resource, policy, or event with the stated pass condition before
-continuing.
+continuing. Facilitators provisioning environments ahead of class: see
+xref:14-facilitator-guide.adoc[Facilitator Guide].
+
+== Choose your track by allotted time
+
+The navigation groups the modules into two tracks plus a closing finale. Pick by the time you have:
+
+* *Core track — about 2 hours in class*: Modules 1, 2, and 4. Deploy the
+  gateway, prove policy enforcement on the pod boundary, then validate the
+  SAW environment and drive the agent, and finish at the Guardrails Finale
+  (Module 8). Module 3 (90–150 min) is prework done
+  before class — or skip it when the facilitator deploys SAW with the fleet
+  install script; either way, SAW is up before class.
+* *Extended track — everything, about 5 hours total*: adds Modules 5, 6, and
+  7 to the core — you set up everything yourself,
+  including Module 3. The complete OpenShell → OpenClaw → SAW experience plus
+  the fleet capstone — both tracks finish at the same Guardrails Finale.
+
+Dependencies, so you can enter where your time allows:
+
+* Module 4 (core track) requires a running SAW environment — deployed by the
+  facilitator with the fleet install script, or installed by you as the
+  Module 3 prework before class.
+* Modules 5 and 6 require Module 4 (gateway configured, SAW validated).
+* The capstone (Module 7) requires SAW and Module 4's client configuration
+  only — the raw OpenShell modules (1-2) are not a prerequisite, so
+  time-constrained participants can jump straight to it.
+* Module 8 (guardrails) is fully standalone — it needs only the OpenShift AI
+  foundation and an API key — and closes both tracks.
 
 == Workshop map
 
@@ -61,46 +92,55 @@ continuing.
 
 | 2. Policy and Security
 | Test allowed and blocked actions, then hot-reload a policy change.
-| 35 min
+| 45 min
 
-| 3. Optional: Install Secure Agent Workspace
-| Install the SAW pattern and wait for the VM and setup Job.
-| 90-150 min optional
+| 3. Prework: Install Secure Agent Workspace
+| Install the SAW pattern — or confirm the facilitator deployed it — and wait for the VM and setup Job.
+| 90-150 min, before class
 
 | 4. Validate and Operate Secure Agent Workspace
 | Configure OIDC access, validate the deployed workspace, and run OpenClaw.
 | 35 min
+|===
+
+*Core track total:* about 2 hours in class, with Module 3 as prework.
+
+[cols="1,3,1",options="header"]
+|===
+| Module | Outcome | Time
 
 | 5. Interact with the Agent
 | Test permitted and rejected actions and inspect policy evidence.
-| 25 min
+| 35 min
 
 | 6. Secure Agent Workspace
 | Inspect identity, secret delivery, VM isolation, and GitOps ownership.
 | 30 min
 
 | 7. SRE Copilot Capstone
-| Optional: investigate an incident with a separately provisioned agent fleet.
-| 45 min optional
+| Investigate an incident with the governance-scoped agent fleet.
+| 45 min
 
 | 8. Model-Boundary Guardrails
 | Deploy a NeMo Guardrails server, prove rails block sensitive input, and wire a client application.
-| 60 min
+| 75 min
 
-| 9. Optional: Security CTF
-| Apply every raw-track control layer against timed challenges.
-| 30 min optional
 |===
 
-*Estimated core total:* approximately 2 hours 45 minutes, excluding the
-optional SAW installation, SRE extension, and Security CTF.
+*Extended track total:* about 5 hours including the core track — the
+complete experience.
 
 == Technical model
 
 OpenClaw gives an agent useful tools. OpenShell decides which tools and
 destinations it can actually use. Secure Agent Workspace adds an enterprise
 operating model around that boundary: identity, per-user isolation, secret
-delivery, GitOps policy, and auditable access.
+delivery, GitOps policy, and auditable access. NeMo Guardrails adds the third
+layer: a model boundary in front of the LLM, where input and output rails
+limit what the model receives and returns. The three layers are complementary:
+OpenShell limits what the agent can execute, the workspace controls what the
+agent runs on and who can reach it, and guardrails limit what the model
+receives and returns — no single layer is comprehensive on its own.
 
 [quote]
 Capabilities are explicit, scoped, enforced outside the model, and visible to

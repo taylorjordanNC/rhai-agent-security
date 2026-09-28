@@ -3,12 +3,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-source "$REPO_ROOT/common/functions.sh"
+source "$SCRIPT_DIR/functions.sh"
 
 NAMESPACE="${NAMESPACE:-openshell}"
 OPENSHELL_VERSION="${OPENSHELL_VERSION:-0.0.103}"
-RAW_GATEWAY_NAME="${RAW_GATEWAY_NAME:-continuum-raw}"
+RAW_GATEWAY_NAME="${RAW_GATEWAY_NAME:-local-gateway}"
 export OPENSHELL_VERSION RAW_GATEWAY_NAME
 PASSED=0
 FAILED=0

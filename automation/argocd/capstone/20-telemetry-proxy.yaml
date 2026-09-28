@@ -1,0 +1,79 @@
+# Module 7 prerequisite: the plain-HTTP telemetry proxy in front of the
+# TLS-only Thanos querier and RHOAI MLflow server. The sandbox supervisor's
+# egress proxy inspects HTTP; TLS-only upstreams route through here, so the
+# fleet's per-agent ceilings name this proxy (ports 8080 metrics, 8081 MLflow).
+# Sync wave 2 — lands in openshell-agents, which the SAW deployment creates
+# (the SAW deployment is a prerequisite of this Application).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: telemetry-proxy-conf
+  namespace: openshell-agents
+  labels:
+    app: telemetry-proxy
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/sync-wave: "2"
+data:
+  default.conf: |
+    server {
+      listen 8080;
+      location / {
+        proxy_pass https://thanos-querier.openshift-monitoring.svc.cluster.local:9091;
+        proxy_ssl_verify off;
+        proxy_ssl_server_name on;
+        proxy_set_header Host thanos-querier.openshift-monitoring.svc.cluster.local;
+      }
+    }
+    server {
+      listen 8081;
+      location / {
+        proxy_pass https://mlflow.redhat-ods-applications.svc.cluster.local:8443;
+        proxy_ssl_verify off;
+        proxy_ssl_server_name on;
+        proxy_set_header Host mlflow.redhat-ods-applications.svc.cluster.local;
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telemetry-proxy
+  namespace: openshell-agents
+  labels:
+    app: telemetry-proxy
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: telemetry-proxy }
+  template:
+    metadata:
+      labels: { app: telemetry-proxy }
+    spec:
+      containers:
+        - name: nginx
+          image: nginxinc/nginx-unprivileged:stable
+          ports: [{ containerPort: 8080 }, { containerPort: 8081 }]
+          resources:
+            requests: { cpu: 25m, memory: 32Mi }
+            limits: { memory: 128Mi }
+          volumeMounts:
+            - { mountPath: /etc/nginx/conf.d, name: conf }
+      volumes:
+        - name: conf
+          configMap: { name: telemetry-proxy-conf }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: telemetry-proxy
+  namespace: openshell-agents
+  labels:
+    app.kubernetes.io/part-of: sre-copilot-capstone
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  selector: { app: telemetry-proxy }
+  ports:
+    - { name: thanos, port: 8080, protocol: TCP, targetPort: 8080 }
+    - { name: mlflow, port: 8081, protocol: TCP, targetPort: 8081 }

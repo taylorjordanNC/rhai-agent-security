@@ -1,0 +1,88 @@
+= Facilitator Guide
+:navtitle: Facilitator Guide
+
+For facilitators provisioning workshop environments ahead of class.
+Participants can skip this page.
+
+Division of labor: the gitops path deploys the workshop
+prerequisites; the fleet scripts install SAW per
+cluster; participants run xref:05-module-03-deploy-secure-agent-workspace.adoc[Module 3]
+only when self-deploying. The fleet scripts loop that module's documented
+procedure and never duplicate fork logic.
+
+Do not provision SAW ahead of time when the class is meant to run the
+lengthy manual setup: deploying SAW with the fleet script removes
+xref:05-module-03-deploy-secure-agent-workspace.adoc[Module 3] from the
+extended track, because that module is the documented manual install.
+Setup the clusters with the fleet automation scripts only when participants should skip those steps.
+
+== Provision the clusters
+
+One-time shared assets, reused for every cluster:
+
+[source,bash,subs="attributes+"]
+----
+mkdir -p ~/git && git clone --branch {saw_repo_branch} \
+  {saw_repo_url} ~/git/{saw_repo_dir}
+cp ~/git/{saw_repo_dir}/values-secret.yaml.template ~/values-secret.yaml
+cd ~/git/{saw_repo_dir} && make generate-keys
+----
+
+OpenShift-GitOps / ArgoCD must be enabled in the OpenShift cluster. Point each cluster's Argo CD at the workshop root — either the RHDP order's
+gitops path targets `automation/argocd/apps` (the order creates the root), or
+apply the shipped root once:
+
+[source,bash,subs="attributes+"]
+----
+oc apply -f {automation_repo}/argocd/root.yaml
+----
+
+[CAUTION]
+====
+Skip the fleet install below when participants must go through the manual
+SAW setup themselves: a fleet-provisioned environment means Module 3 is
+already done, and the class loses that manual experience.
+====
+
+Fill `clusters.csv` from the RHDP orders (gitignored — never commit it), then
+install SAW per cluster:
+
+[source,bash,subs="attributes+"]
+----
+cp {automation_repo}/fleet/clusters.csv.example {automation_repo}/fleet/clusters.csv
+./{automation_repo}/fleet/fleet-install.sh --jobs 5
+----
+
+Timing: ~50-70 min per cluster (the pattern GitOps
+health loop ~30-50 min); VM setup continues in-cluster for ~1-3h after the
+install returns. 50 clusters: 5 workers ≈ 10h, 10 workers ≈ 5h. Knobs:
+`--wait` blocks per cluster until the setup Job completes, `--dry-run` prints
+the plan, `--no-emulation` for KVM-capable clusters only.
+
+Before `--jobs > 1`: commit and push local fork changes to
+{saw_repo_branch} — worker clones come from the fork, so uncommitted fixes
+are missing from them.
+
+== Verify every cluster
+
+[source,bash]
+----
+./{automation_repo}/fleet/fleet-status.sh
+----
+
+Shows Argo CD Application sync/health, the SAW VM phase, the setup Job, and
+the workshop namespaces per cluster. Any cluster whose Applications are not
+Healthy or whose VM is not Running needs attention before class; use the
+installation diagnostics in xref:05-module-03-deploy-secure-agent-workspace.adoc[Module 3].
+
+== Day of class
+
+* Both checkouts and participant tooling are ready per
+  xref:02-details.adoc[Prerequisites and Environment].
+* With SAW provisioned ahead of time, participants skip Module 3 and start at
+  xref:03-module-01-basic-openshell.adoc[Module 1], or jump straight to the
+  xref:09-module-07-sre-capstone.adoc[capstone].
+* When the class runs the manual setup instead, participants install SAW as
+  the Module 3 prework before class and the extended-track total grows by
+  90-150 min.
+* Console URLs come from the RHDP orders.
