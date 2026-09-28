@@ -2,103 +2,85 @@
 :navtitle: Prerequisites and Environment
 
 This workshop uses one multinode OpenShift {ocp_version} cluster. The raw
-OpenShell sandbox environment supplies the raw OpenShell gateway and policy
-sandbox. Secure Agent
-Workspace (SAW) supplies the cluster-resident NemoClaw/OpenClaw runtime inside a
-per-user VM.
+OpenShell sandbox environment supplies the OpenShell gateway and policy sandbox
+(Modules 1 and 2). Secure Agent Workspace (SAW) supplies the cluster-resident
+NemoClaw/OpenClaw runtime inside a per-user VM (Module 4). SAW is deployed
+once — by the facilitator with the fleet install script (`automation/fleet/`),
+or by you as the Module 3 prework before class.
 
-The core track (Modules 1, 2, and 4) operates SAW in Module 4, so a running
-SAW environment is core-track preparation: the facilitator deploys it with the
-fleet install script (`automation/fleet/`), or you install it yourself as the
-Module 3 prework before class.
+== What you need
 
-The local environment where you run commands from must have the `rhai-agent-security` repository available. Obtain its approved repository URL from the facilitator. Commands
-that reference `{automation_repo}` assume the terminal is at that checkout's
-repository root; verify `test -f {automation_repo}/Makefile` before starting.
+|===
+| If you are… | You need
 
-NemoClaw includes a standalone `nemoclaw onboard` workflow, a local container-runtime
-workflow, and is not used by this workshop. The SAW integration installs a
-BOM-configured NemoClaw runtime in the VM and provisions its sandboxes through the
-OpenShell gateway.
+| Every participant
+(Prerequisites, Modules 1, 2, 8)
+| `oc` authenticated to the target cluster; Helm 3.x; Git, `curl`, OpenSSL,
+`tar`, `install`, and standard Unix shell tools; the OpenShell CLI pinned to
+`{openshell_version}` (installed below); both workshop checkouts
+(see xref:#_get_the_workshop_checkouts[Get the workshop checkouts]).
 
-== Required for the raw OpenShell sandbox environment (Modules 1 and 2)
+| Module 4 — operate SAW
+(core track)
+| Everything above, plus: `virtctl`, `kubectl`, `jq`, GNU Make, SSH, `lsof`,
+Python 3 with PyYAML on the control node; a Keycloak OIDC account for the SAW
+gateway; the SAW checkout with its generated SSH key, namespace read access,
+and assigned workspace details (facilitator-supplied).
 
-Requirements provided by facilitators:
+| Self-deploying SAW
+(Module 3 prework only)
+| Everything above, plus: cluster-admin access and a dedicated workshop
+cluster; at least 16 CPUs and 32 GiB of memory for software emulation, or
+nodes with hardware virtualization available to OpenShift Virtualization;
+capacity and default storage for operators, DataVolumes, the workspace VM,
+image imports, and setup Jobs; Podman or Docker for image preparation and
+registry authentication; an inference provider configured through the SAW
+secret contract — never in workshop files or prompts; an
+link:https://docs.nvidia.com/ngc/gpu-cloud/ngc-user-guide/index.html#generating-api-key[NVIDIA NGC API key^]
+for the default inference provider; a Brave Search API subscription and key
+for the default web-search provider, or a deployment fork with the Brave
+provider disabled before install.
+|===
 
-* A multinode OpenShift {ocp_version} cluster.
-* Cluster-admin permission to install an OLM Subscription and cluster-scoped
-  Agent Sandbox CRDs/RBAC, grant the privileged SCC to the sandbox service
-  account, create the `openshell` namespace, and install a Helm release.
-* The Red Hat Agent Sandbox operator channel used by the raw OpenShell install,
+Provided by the facilitators:
+
+* A multinode OpenShift {ocp_version} cluster with cluster-admin: an OLM
+  Subscription, cluster-scoped Agent Sandbox CRDs/RBAC, the privileged SCC for
+  the sandbox service account, the `openshell` namespace, and a Helm release.
+* The Agent Sandbox operator channel used by the raw OpenShell install,
   `{agent_sandbox_channel}`.
-* A default StorageClass. The OpenShell gateway stores its SQLite data in a
+* A default StorageClass — the OpenShell gateway stores its SQLite data in a
   1Gi PVC.
 * Cluster and registry egress sufficient to install Agent Sandbox, pull the
   Helm chart, and pull the sandbox image.
+* SAW deployment with the fleet install script, unless you complete the
+  Module 3 prework.
 
-Requirements that must be handled by the users:
+Rules:
 
-* `oc` authenticated to the target cluster.
-* Helm 3.x, Git, `curl`, OpenSSL, `tar`, `install`, and standard Unix shell tools.
-* The OpenShell CLI matching the selected gateway. The raw OpenShell baseline is
-  `{openshell_version}`; the SAW guest gateway is `{openshell_saw_version}`.
-  Do not mix client and gateway versions.
-
-Module 4 (core track) also uses the tools in this list — `oc`, the OpenShell
-CLI, and cluster access — but against the SAW gateway and its own version pin.
-
-The raw policy track does not require a model API key.
-
-== Required to operate SAW (Module 4 — part of the core track)
-
-Module 4 is part of the core track. It operates the SAW environment on the
-same cluster, so the SAW deployment is a core-track prerequisite: the
-facilitator deploys it with the fleet install script, or you install it as
-the Module 3 prework before class. Whoever deployed it, Module 4 needs:
-
-* `virtctl` matching the cluster when inspecting or troubleshooting a VM.
-* A Keycloak OIDC account for the SAW gateway.
-* Git, `kubectl`, `jq`, GNU Make, SSH, `curl`, `lsof`, and Python 3 with PyYAML
-  on the control node.
-* The SAW checkout, generated SSH key, namespace read access, and assigned
-  workspace details supplied by the facilitator.
-
-Module 4 assumes the environment already exists — it needs nothing beyond this
-list and the baseline above, regardless of who deployed SAW. The inference
-provider is configured at SAW install time (Module 3 or the facilitator)
-through Vault and External Secrets Operator; Module 4 only consumes it.
-
-== Required to install SAW (Module 3 prework — self-deployment only)
-
-Skip this list when the facilitator has already deployed SAW with the fleet
-install script. Installing SAW yourself as the Module 3 prework additionally
-requires:
-
-* Cluster-admin access and a dedicated workshop cluster.
-* At least 16 CPUs and 32 GiB of memory for software emulation, or nodes with
-  hardware virtualization available to OpenShift Virtualization.
-* Capacity and default storage for operators, DataVolumes, the workspace VM,
-  image imports, and setup Jobs.
-* Podman or Docker for image preparation and registry authentication.
-* An inference provider configured through the SAW secret contract. Do not put
-  the provider key in workshop files or prompts.
-* An NVIDIA NGC account and API key for the default inference provider. Create
-  the key by following the link:https://docs.nvidia.com/ngc/gpu-cloud/ngc-user-guide/index.html#generating-api-key[NGC API key instructions^].
-* A Brave Search API subscription and key for the default web-search provider,
-  or a deployment fork in which the Brave provider is disabled before install.
-
-The SAW implementation uses BOM-configured agent images and an OpenShell gateway
-pinned to `{openshell_saw_version}` in the guest VM. Its Makefile targets
-configure the gateway, select a workspace, and connect to the sandbox. They do
-not use `nemoclaw onboard` on the participant workstation.
+* Match the client to its gateway: `{openshell_version}` for the raw OpenShell
+  track, `{openshell_saw_version}` for the SAW guest gateway. Do not mix
+  client and gateway versions.
+* The raw policy track requires no model API key.
+* The standalone NemoClaw CLI (`nemoclaw onboard`, local container-runtime
+  workflow) is not used by this workshop. The SAW integration installs a
+  BOM-configured NemoClaw runtime in the VM and provisions its sandboxes
+  through the OpenShell gateway.
+* Windows: the native Windows binary does not provide the Kubernetes/VM driver
+  workflow used here. Install WSL2 with Ubuntu and run the Linux x86_64
+  instructions inside it (keeping `openshell`, `oc`, `helm`, `virtctl`, the
+  SAW SSH key, and `make`/`jq` in the same WSL2 environment), or use a RHEL 10
+  or Fedora bastion for SAW deployment, gateway configuration, and
+  troubleshooting — Windows users can use the browser-based Control UI and SSH
+  to the bastion.
 
 == Install the command-line tools
 
-Install `oc` from the OpenShift console's client download page or the
+If you do not already have the tools, install `oc` from
+the OpenShift console's client download page or the
 link:https://mirror.openshift.com/pub/openshift-v4/clients/ocp/[matching client
-release^]. Install Helm from the
-link:https://helm.sh/docs/intro/install/[official instructions^]. The lab image
-may already contain both tools.
+release^], and Helm from the link:https://helm.sh/docs/intro/install/[official
+instructions^].
 
 Install the exact OpenShell client from the workshop repository root. The
 installer selects the Linux x86_64, Linux ARM64, or Apple Silicon artifact:
@@ -111,35 +93,16 @@ OPENSHELL_INSTALL_DIR="$HOME/openshell-cli" \
 export PATH="$HOME/openshell-cli:$PATH"
 ----
 
-Persist that `PATH` setting in the control node's `.bashrc` or `.zshrc`. Do not
-use an unpinned latest installer for this workshop.
+Persist that `PATH` setting in the control node's `.bashrc` or `.zshrc`. Do
+not use an unpinned latest installer for this workshop.
 
-On Windows, do not install the native Windows binary for this workshop. The
-native Windows lane does not provide the Kubernetes/VM driver workflow used by
-the OpenShift and SAW paths. OpenShell documents WSL2 as experimental; a
-Windows participant may install WSL2 with an Ubuntu distribution and run the
-Linux x86_64 instructions above inside WSL2. Keep `openshell`, `oc`, `helm`,
-`virtctl`, the SAW SSH key, and the `make`/`jq` tools in the same WSL2
-environment. Test the OIDC browser callback and SSH proxy before the workshop.
-
-For a supported and predictable experience, obtain a RHEL 10 or Fedora bastion
-for SAW deployment, gateway configuration, and troubleshooting. Windows users
-can still use the browser-based Control UI from Windows and connect to the
-bastion with SSH. A bastion is recommended for the facilitator and deployment
-operator; it is not required for a Windows participant if the WSL2 path has been
-validated in advance.
-
-For the SAW VM inspection commands, install `virtctl` from the OpenShift
-console client download that matches the cluster. Keep the SSH key generated by
-SAW on the same workstation as `virtctl`.
-
-The workshop does not require the standalone NemoClaw CLI. SAW provisions the
-BOM-configured NemoClaw runtime in the VM.
+For SAW VM inspection and troubleshooting, install `virtctl` from the
+OpenShift console client download that matches the cluster, and keep the
+SAW-generated SSH key on the same workstation.
 
 == Verify the command-line tools
 
-Install and verify the cluster-facing tools before connecting. Run the
-baseline check in every new terminal:
+Run the baseline check in every new terminal:
 
 [source,bash,subs="attributes+"]
 ----
@@ -151,9 +114,9 @@ helm version
 test "$(openshell --version | awk '{print $NF}')" = "{openshell_version}"
 ----
 
-Expected result: every tool prints its install path — a missing line names the
-absent tool. The final `test` line is the version pin: it fails if the
-installed OpenShell client is anything but `{openshell_version}`.
+Expected result: every tool prints its install path. The final `test` line is
+the version pin — it fails if the installed OpenShell client is anything but
+`{openshell_version}`.
 
 SAW operation additionally requires these tools on the control node:
 
@@ -167,28 +130,20 @@ python3 -c 'import yaml'
 ----
 
 Expected result: the same — every path printed, `virtctl` reporting a client
-version, and the PyYAML import exiting silently when present.
-
-The OpenShell CLI must report `{openshell_version}`. The SAW guest gateway reports the
-more specific `{openshell_saw_version}` build; that is the expected Red Hat SAW
-packaging suffix for the same compatibility line.
+version, and the PyYAML import exiting silently when present. The SAW guest
+gateway reports the `{openshell_saw_version}` build — the expected Red Hat SAW
+packaging suffix on the same compatibility line.
 
 == Get the workshop checkouts
 
 Two checkouts are needed, and the modules reference them by role, not by a
 fixed path — clone each to any location you prefer:
 
-Clone the workshop repository and change to its repository root. Obtain its
-approved repository URL from the facilitator:
-
 [source,bash,subs="attributes+"]
 ----
-git clone <approved repository URL from the facilitator>
+git clone https://github.com/taylorjordanNC/rhai-agent-security.git
 cd rhai-agent-security
 ----
-
-Clone the Secure Agent Workspace checkout — the SAW Make targets, SSH key, and
-tunnel script live there:
 
 [source,bash,subs="attributes+"]
 ----
@@ -224,10 +179,8 @@ procedure creates its own SAW checkout — use that one.
   the deployment.
 |===
 
-The core track — Modules 1, 2, and 4 — spans both checkouts: Modules 1-2 run
-from the workshop repository root and Module 4 runs from the SAW checkout root.
-Have both checkouts ready before class, whether the facilitator deployed SAW
-with the fleet install script or you complete the Module 3 prework yourself.
+The core track (Modules 1, 2, and 4) spans both checkouts — have both ready
+before class.
 
 == Verify the workshop automation and SAW fork
 
@@ -251,8 +204,6 @@ from it.
 
 == Run the OpenShift pre-flight check
 
-Confirm the cluster context and storage before installing:
-
 [source,bash,role="execute",subs="attributes+"]
 ----
 oc whoami
@@ -262,14 +213,11 @@ oc auth can-i create subscriptions.operators.coreos.com -n openshift-operators
 oc auth can-i use scc/privileged
 ----
 
-What each command establishes:
-
-* `whoami` and `--show-server` confirm you are authenticated to the intended
-  cluster before installing anything;
-* `get storageclass` confirms the default storage the gateway PVC will bind to;
-* the two `auth can-i` checks are the permission gates: creating an OLM
-  Subscription (the Agent Sandbox operator) and using the privileged SCC (the
-  sandbox service account). Both must print `yes`.
+`whoami --show-server` confirms you are authenticated to the intended cluster;
+`get storageclass` confirms the default storage the gateway PVC will bind to;
+both `auth can-i` checks must print `yes` — creating an OLM Subscription (the
+Agent Sandbox operator) and using the privileged SCC (the sandbox service
+account).
 
 For a facilitator-provisioned SAW workspace, check the VM and setup Job:
 
@@ -279,24 +227,17 @@ oc -n {saw_namespace} get vm,vmi,job
 oc -n {saw_gitops_namespace} get applications.argoproj.io
 ----
 
-The Secure Agent Workspace uses Vault and External Secrets Operator for provider
-credentials and SSH material. Do not reuse local NemoClaw environment variables
-as a production secret store.
+SAW uses Vault and External Secrets Operator for provider credentials and SSH
+material — do not reuse local NemoClaw environment variables as a production
+secret store.
 
 == Access details
+
+Cluster access details will be provided by the facilitator.
 
 [cols="1,2",options="header"]
 |===
 | Setting | Value
-
-| OpenShift console
-| {openshift_console_url}
-
-| SSH user
-| `{ssh_user}`
-
-| Environment GUID
-| `{guid}`
 
 | Workshop automation
 | `{automation_repo}`
