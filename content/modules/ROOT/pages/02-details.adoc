@@ -37,10 +37,13 @@ image imports, and setup Jobs; Podman or Docker for image preparation and
 registry authentication; an inference provider configured through the SAW
 secret contract — never in workshop files or prompts; an
 link:https://docs.nvidia.com/ngc/gpu-cloud/ngc-user-guide/index.html#generating-api-key[NVIDIA NGC API key^]
-for the default inference provider; a Brave Search API subscription and key
-for the default web-search provider, or a deployment fork with the Brave
-provider disabled before install.
+for the default inference provider.
 |===
+
+Web search is disabled by default in the SAW deployment; to enable it,
+configure the `web-search` secret with a Brave or Tavily key and set
+`enabled: true` on the `brave` provider in the BOM profile
+(`charts/saw-bom/profiles/data-science/default/providers.yaml`).
 
 Provided by the facilitators:
 
