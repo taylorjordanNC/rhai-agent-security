@@ -94,6 +94,47 @@ install breaks on arm64 hosts.
 Shows Argo CD Applications (sync/health), the SAW VM phase, the setup Job,
 and the workshop namespaces per cluster.
 
+The gate (`--gate`) passes apps that are Healthy even when OutOfSync — the
+SAW pattern and the workshop chart both manage parity-declared objects
+(`rhods-operator`, `kubevirt-hyperconverged`), so expected annotation drift
+keeps those apps OutOfSync while Healthy. Only a not-Healthy app (Degraded,
+Progressing, Missing) or a missing workshop namespace fails the gate.
+
+## Troubleshooting
+
+**Golden-image import stuck in ImagePullBackOff** (VM never provisions, DV
+`*-golden` phase ImportScheduled): the setup Job's golden-image import pulls
+`:latest` from the internal registry. Fork revisions before the mirror-tag
+fix push only the pinned version tag, so `:latest` never exists. Tag it
+manually and the crash-looping CDI importer retries:
+
+```bash
+oc tag openshell-agents/openshell-gateway-docker:<version> \
+  openshell-agents/openshell-gateway-docker:latest
+```
+
+Fixed upstream in the fork (`fix(mirror): tag mirrored images as :latest`)
+— only needed on clusters pinned to older fork revisions.
+
+**Agent model calls (the SAW inference path)**: the gateway-side provider is
+wired for the supported provider types — the default is NVIDIA's
+`nvidia/nemotron-3-super-120b-a12b` via the shared NGC key
+(`provider: build` in `values-secret.yaml`), served at
+`integrate.api.nvidia.com`. Verified live: the key works at that endpoint
+and the model completes. Two limitations found during a live run, both in
+the OpenShell gateway/nemoclaw plugin (upstream, not this repository):
+
+* the plugin registers the provider **type's** default endpoint and ignores
+  a re-pointed `endpoint` config — custom OpenAI-compatible endpoints (e.g.
+  a Model-as-a-Service gateway) do not work end-to-end;
+* a provider credential update does **not** propagate to existing sandboxes —
+  the sandbox's injected `NVIDIA_API_KEY` env is frozen at sandbox creation,
+  so rotate credentials by re-creating the sandboxes (or provision fresh
+  clusters with the final key).
+
+Module 8 is unaffected: the guardrails chart calls its Model-as-a-Service
+endpoint directly, no gateway-side provider involved.
+
 ## Environment knobs
 
 | Variable | Default | Purpose |

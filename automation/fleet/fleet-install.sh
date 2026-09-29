@@ -92,7 +92,10 @@ worker_dir_print() { # side-effect-free path for --dry-run (no clone)
 }
 
 ensure_emulation() { # fork-documented HCO loop; idempotent
-  local deadline=$((SECONDS + 1200))
+  # 45 min: fresh clusters provision the CNV operator and its HCO slower than
+  # the pattern install returns — 20 min skipped emulation on a non-KVM host,
+  # which leaves the VM unable to start.
+  local deadline=$((SECONDS + 2700))
   until oc get hco kubevirt-hyperconverged -n openshift-cnv >/dev/null 2>&1; do
     (( SECONDS > deadline )) && { echo "  [$1] HCO never appeared; skipping emulation" >&2; return 1; }
     echo "  [$1] Waiting for the HyperConverged resource..."
