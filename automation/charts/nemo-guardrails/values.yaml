@@ -39,6 +39,10 @@ config: |
     - type: main
       engine: {{ .Values.llm.engine }}
       model: {{ .Values.llm.modelName }}
+      # The server's LLM HTTP client reads the key from the env var named
+      # here (model-level, like the llama_guard entry) — without this it
+      # never sees the injected OPENAI_API_KEY and every model call 401s.
+      api_key_env_var: {{ .Values.llm.apiKeyEnvVar }}
       parameters:
         base_url: "{{ .Values.llm.baseUrl }}"
   {{- if .Values.llamaGuard.enabled }}
