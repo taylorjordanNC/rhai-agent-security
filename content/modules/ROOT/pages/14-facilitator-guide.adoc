@@ -28,6 +28,21 @@ cp ~/git/{saw_repo_dir}/values-secret.yaml.template ~/values-secret.yaml
 cd ~/git/{saw_repo_dir} && make generate-keys
 ----
 
+[IMPORTANT]
+====
+One shared inference key covers every cluster and every participant. Edit
+`~/values-secret.yaml` once: set `provider: build` and an
+link:https://docs.nvidia.com/ngc/gpu-cloud/ngc-user-guide/index.html#generating-api-key[NVIDIA NGC API key^]
+for the default `nvidia/nemotron-3-super-120b-a12b` model, with the key in a
+readable file (for example `~/.ngc-api-key`). The fleet install loads it into
+each cluster's Vault; the gateway-side provider holds it and participants
+never see it — no participant step prompts for a model key on the SAW track.
+Check the key's quota: one key serves every agent turn across all clusters,
+though consumption is modest. Module 8 needs no facilitator key —
+participants obtain their own Model-as-a-Service key and enter it at install
+time.
+====
+
 OpenShift-GitOps / ArgoCD must be enabled in the OpenShift cluster. On RHDP
 orders the order's gitops path deploys the workshop chart
 (`{automation_repo}/argocd`), whose template creates the `module-7-prereqs`

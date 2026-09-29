@@ -58,13 +58,21 @@ Provided by the facilitators:
   Helm chart, and pull the sandbox image.
 * SAW deployment with the fleet install script, unless you complete the
   Module 3 prework.
+* One shared inference key for the SAW track: an
+  link:https://docs.nvidia.com/ngc/gpu-cloud/ngc-user-guide/index.html#generating-api-key[NVIDIA NGC API key^]
+  for the default `nvidia/nemotron-3-super-120b-a12b` model, provisioned
+  through the SAW secret contract (`values-secret.yaml` → Vault). It covers
+  every cluster and participant — no model key is needed from you on the SAW
+  track. The guardrails module (Module 8) is the exception: bring your own
+  Model-as-a-Service key and enter it at install time.
 
 Rules:
 
 * Match the client to its gateway: `{openshell_version}` for the raw OpenShell
   track, `{openshell_saw_version}` for the SAW guest gateway. Do not mix
   client and gateway versions.
-* The raw policy track requires no model API key.
+* The raw policy track requires no model API key; the SAW track's key is
+  facilitator-provisioned through the secret contract.
 * The standalone NemoClaw CLI (`nemoclaw onboard`, local container-runtime
   workflow) is not used by this workshop. The SAW integration installs a
   BOM-configured NemoClaw runtime in the VM and provisions its sandboxes

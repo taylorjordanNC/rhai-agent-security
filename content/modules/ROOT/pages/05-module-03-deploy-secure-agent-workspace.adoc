@@ -1,12 +1,13 @@
 = Module 3: Prework — Install Secure Agent Workspace
 :navtitle: SAW Prework
 
-This module installs Secure Agent Workspace (SAW) on the OpenShift
-cluster. Skip this module when the facilitator has deployed
-SAW with the fleet install script for the workshop. Either way, a running SAW environment is
-core-track preparation:
-xref:06-module-04-create-openclaw-agent.adoc[Module 4], where the core track
-picks up SAW, assumes the environment is already up.
+This module installs Secure Agent Workspace (SAW) on the OpenShift cluster —
+the production-shaped environment from the architecture overview: a dedicated
+VM per workspace owner, with login, secrets, and GitOps governance around it.
+Skip this module when the facilitator has already deployed SAW with the fleet
+install script (one command that stands up SAW for the whole workshop). Either
+way, SAW must be up before class: Module 4 assumes the environment is
+running.
 
 include::secure-agent-workspace:ROOT:partial$deployment/scope.adoc[]
 
@@ -16,11 +17,17 @@ deployment command changes; do not duplicate the procedure in this repository.
 
 == Deployment scope
 
-The raw OpenShell sandbox environment and SAW deployment are separate
-environments. This installation
-adds a KubeVirt VM for the configured workspace owner, an OpenShell gateway and
-container runtime inside that VM, Keycloak OIDC, Vault and External Secrets, a
-governance interceptor, and GitOps-managed configuration.
+The raw OpenShell sandbox environment and the SAW deployment are separate
+environments. This installation adds, in one pass:
+
+* a KubeVirt VM (virtual machines on OpenShift) for the configured workspace
+  owner, with an OpenShell gateway and container runtime inside it;
+* Keycloak OIDC — single sign-on login for the CLI and gateway;
+* Vault and External Secrets — a secrets manager, plus the operator that
+  syncs its values into cluster Secrets;
+* a governance interceptor — the policy check between the gateway and
+  sandbox operations; and
+* GitOps-managed configuration, with Argo CD keeping the cluster matching Git.
 
 Use a dedicated workshop cluster. The pattern installs cluster-scoped operators
 and OpenShift Virtualization resources; its uninstall path can affect other
@@ -30,17 +37,21 @@ virtualization workloads.
 
 * Select a supported control node and verify OpenShift Virtualization capacity.
 * Prepare SAW SSH keys and provider secret values without committing credentials.
-* Mirror the required images and install the Validated Pattern.
+* Mirror the required images — copy them from their upstream registries into
+  your cluster's registry — and install the Validated Pattern (Red Hat's
+  reference deployment).
 * Identify the installation stop condition and collect failure diagnostics.
 
 == Exercise 1: Prepare the control node
 
-Install and verify the control-node tooling first. The included partial installs
+The control node is the machine you run this installation from. Install and
+verify the control-node tooling first. The included partial installs
 the pinned OpenShell client and lists every dependency:
 
 include::secure-agent-workspace:ROOT:partial$deployment/control-node.adoc[]
 
-Then run the workshop preflight from the workshop repository root:
+Then run the workshop preflight — a pre-install check of every dependency —
+from the workshop repository root:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -69,6 +80,9 @@ oc -n {saw_namespace} wait --for=condition=complete \
 test "$(oc -n {saw_namespace} get vmi {saw_gateway_name} \
   -o jsonpath='{.status.phase}')" = "Running"
 ----
+
+In short: the setup Job — the job that configures the VM — finished, and the
+VM is up.
 
 If either assertion fails, use the installation diagnostics before retrying:
 

@@ -78,7 +78,7 @@ Dependencies, so you can enter where your time allows:
   only — the raw OpenShell modules (1-2) are not a prerequisite, so
   time-constrained participants can jump straight to it.
 * Module 8 (guardrails) is fully standalone — it needs only the OpenShift AI
-  foundation and an API key — and closes both tracks.
+  foundation and your own Model-as-a-Service API key — and closes both tracks.
 
 == Workshop map
 

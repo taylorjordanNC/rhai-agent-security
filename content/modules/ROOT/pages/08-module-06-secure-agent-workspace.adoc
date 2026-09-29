@@ -38,7 +38,9 @@ User / CLI / browser
 ----
 
 In this workshop deployment, the configured owner receives a dedicated Fedora
-VM managed by OpenShift Virtualization. OpenShell and the agent run inside that
+VM managed by OpenShift Virtualization, built from a golden image (a prebuilt,
+validated VM image, so every owner starts from the same known state). OpenShell
+and the agent run inside that
 VM. Additional users require additional provisioned releases or workspace
 automation; this workshop does not prove multi-user provisioning.
 
@@ -95,9 +97,11 @@ Keep these responsibilities distinct while diagnosing the environment:
 * OpenShell contains and governs the agent runtime inside the VM.
 * Keycloak authenticates the OpenShell CLI and administrative dashboard path.
 * Vault and External Secrets deliver provider and workspace credentials without
-  putting them in workshop files or prompts.
+  putting them in workshop files or prompts — Vault is the secrets manager,
+  and External Secrets Operator syncs its values into cluster Secrets.
 * The interceptor and ArgoCD turn approved policy data into a repeatable
-  process; configured provider and sandbox creation bindings fail closed.
+  process; configured provider and sandbox creation bindings fail closed —
+  anything outside the governance baseline is refused, never silently allowed.
 
 == Exercise 1: Inspect VM and reconciliation state
 
@@ -109,7 +113,8 @@ from the SAW checkout root on the control node, then inspect the workload view:
 oc -n {saw_namespace} get vm,vmi,dv,job,pods,route
 ----
 
-Expected result: the workspace VM, its DataVolume, the setup Job, and the
+Expected result: the workspace VM, its DataVolume (the disk image backing the
+VM), the setup Job, and the
 dashboard Route are all present in their expected states.
 
 Trace the GitOps ownership:
@@ -135,7 +140,7 @@ oc -n {saw_namespace} get vm/{saw_gateway_name} -o yaml | \
 Expected result: the `argocd.argoproj.io`, `app.kubernetes.io`, and `helm.sh`
 labels appear — the audit trail from the pattern to the VM.
 
-List the BOM sandboxes the gateway vends:
+List the BOM sandboxes the gateway vends — creates and serves on request:
 
 [source,bash,role="execute",subs="attributes+"]
 ----

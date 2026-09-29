@@ -31,6 +31,9 @@ flowchart LR
     OR -->|allowed| A[Response to client]
 ----
 
+In short: nothing reaches the model except through this checkpoint — and the
+checkpoint is configuration you can read and change.
+
 Three facts follow from this shape, and each exercise proves one of them:
 
 * **Rails are the only path in and out.** A blocked request never reaches the
@@ -81,13 +84,11 @@ the round trip.
 
 === Engine selection
 
-The server routes each configuration to one of two engines. Configurations
-that use only input, output, and tool rails compile to the lighter IORails
-engine, which dispatches rail actions directly and supports parallel rail
-execution. Configurations that use dialog rails, retrieval rails, custom
-actions, or Colang 2.x fall back to the full LLMRails engine. The rails in
-this module resolve under either engine; the distinction matters when you add
-custom actions or dialog flows in production.
+The server picks one of two engines per configuration: configs that use only
+input, output, and tool rails run on the lighter IORails engine; anything
+fancier — dialog rails, retrieval rails, custom actions, Colang 2.x — uses the
+full LLMRails engine. Everything in this module works under either; the
+distinction matters when you add custom actions or dialog flows in production.
 
 === What the API returns
 
@@ -122,7 +123,10 @@ API requests must carry the configured model name.
 * OpenShift AI with the TrustyAI component `Managed` in the DataScienceCluster.
   This is the foundation deployment; this module does not install it.
 * A remote OpenAI-compatible model endpoint, the model name it serves, and
-  your own API key for it. Do not commit the key to any file.
+  your own API key for it. The workshop pins a Model-as-a-Service endpoint —
+  obtain your key from the MaaS platform, or use any OpenAI-compatible
+  endpoint and key you hold. Do not commit the key to any file. This module
+  is standalone: the SAW gateway's inference key does not apply here.
 * `oc` authenticated to the cluster, Helm 3.x, `curl`, and Python 3 with
   PyYAML on the control node. Exercise 6 additionally installs the OpenAI
   SDK with `pip`.
@@ -263,7 +267,8 @@ Inspect the rails definition and locate three things:
 
 * `rails.config.regex_detection.input.patterns`: the regex rails: SSN,
   credit card, email, phone, credential keywords, and model-name leaks.
-* `rails.config.sensitive_data_detection`: the Presidio entities checked on
+* `rails.config.sensitive_data_detection`: the Presidio entities (Presidio is
+  Microsoft's PII-detection library) checked on
   input and output.
 * `rails.input.flows` and `rails.output.flows`: which rails run at each
   boundary, and that output streaming is enabled.

@@ -1,7 +1,8 @@
 = Module 7: SRE Copilot Capstone
 :navtitle: SRE Copilot Capstone
 
-The capstone extension runs a three-agent observability fleet against the
+The capstone extension runs a three-agent observability fleet — three
+specialist agents, each with its own narrow permission — against the
 deployed Secure Agent Workspace. Participants verify governance-signed
 per-agent access, investigate live telemetry, drive a real outage in the
 browser, and confirm the remediation as a human.
@@ -70,11 +71,11 @@ probes and audit evidence, never taken from the agent's own output.
 | Agent | Allowed backend | Job
 
 | `metrics`
-| Prometheus (Thanos querier) via the telemetry proxy
+| Prometheus (the cluster metrics store, queried through Thanos) via the telemetry proxy
 | Quantify rates, saturation, and failing workloads from live cluster metrics.
 
 | `traces`
-| MLflow (RHOAI) via the telemetry proxy
+| MLflow (Red Hat OpenShift AI) via the telemetry proxy
 | Read and reason over AI agent execution traces — agents auditing agents.
 
 | `analyst`
@@ -132,7 +133,8 @@ That bootstraps the single cluster and blocks until `module-7-prereqs` is
 Synced/Healthy. Before participants arrive, run `./fleet-status.sh --gate`
 across the fleet: it exits non-zero if any cluster is not ready.
 
-The PostSync seed job plants the agent-session traces of a *prior* incident
+The PostSync seed job — it runs after every successful Argo CD sync — plants
+the agent-session traces of a *prior* incident
 (`INC-4127`) into MLflow — the data the traces agent investigates below —
 and re-plants idempotently on each sync. What stays with the facilitator:
 
@@ -144,7 +146,7 @@ and re-plants idempotently on each sync. What stays with the facilitator:
   the workspace VM stages `/tmp/incident-search.json`,
   `/tmp/mlflow.token` and `/tmp/agent-session-trace.json` inside the
   `traces` sandbox (idempotent — it also refreshes the planted story), and
-  stages `$SA_TOKEN`, a read-only service account token, in the `metrics`
+  stages `/tmp/sa.token`, a read-only bearer token, in the `metrics`
   sandbox environment.
 
 The fleet sandboxes are provisioned in the gateway's default workspace, so
@@ -257,7 +259,7 @@ check the health of the `demo` namespace, or query directly:
 [source,bash,role="execute",subs="attributes+"]
 ----
 openshell --gateway {saw_gateway_name} sandbox exec -n metrics -- \
-  sh -c 'curl -s --max-time 15 -H "Authorization: Bearer $SA_TOKEN" \
+  sh -c 'curl -s --max-time 15 -H "Authorization: Bearer $(cat /tmp/sa.token)" \
     "http://telemetry-proxy.openshell-agents.svc.cluster.local:8080/api/v1/query?query=kube_deployment_status_replicas_available%7Bnamespace%3D%22demo%22%7D"'
 ----
 
@@ -289,7 +291,8 @@ recovery check — each trace tagged with the role that ran it
 (`agent.role`: `metrics`, `traces`, `analyst`, `ops`). Narrow the search
 the same way for any question (for example
 `tags."agent.role" = "metrics"`), then drill into one finding by ID.
-OTLP-ingested traces carry a `tr-` prefix on their trace ID:
+Traces ingested through OTLP (OpenTelemetry's trace protocol) carry a `tr-`
+prefix on their trace ID:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -348,7 +351,8 @@ oc -n redhat-ods-applications get route
 
 If an MLflow Route is listed, open it and find the `sre-copilot-fleet`
 experiment: the planted `INC-4127` session appears as a visual trace
-waterfall — each span a tool call the fleet made, tagged with the role that
+waterfall — each span (one step in the trace: a tool call the fleet made),
+tagged with the role that
 ran it. Seeing the same evidence as a picture next to the CLI output is the
 "agents auditing agents" demo moment. If no Route is exposed, the CLI trace
 reads above are the same evidence.

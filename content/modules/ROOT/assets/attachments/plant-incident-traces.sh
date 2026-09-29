@@ -10,6 +10,12 @@
 # Runs on the Secure Agent Workspace VM (or anywhere that can reach the
 # telemetry proxy and has an OCP bearer token with MLflow API access).
 #
+# TOKEN FRESHNESS: the staged tokens (/tmp/mlflow.token, /tmp/sa.token) are
+# the OCP bearer token you pass in — they expire with your OCP session, which
+# on RHDP workshop clusters can be hours. Run this script close to class time
+# so the staged tokens are fresh for the module; re-run to refresh them (the
+# script is idempotent).
+#
 # Usage:
 #   OCP_TOKEN="$(oc whoami -t)" ./plant-incident-traces.sh
 #
@@ -258,4 +264,18 @@ PYSAMPLE
 else
   log "WARN: traces sandbox container not found; skip staging (search payload kept at $WORKDIR/search-body.json)"
   printf '%s\n' "$SEARCH_BODY" > "$WORKDIR/search-body.json"
+fi
+
+# ---------------------------------------------------------------------------
+# 6. Stage the metrics agent's token — the read-only bearer token Exercise 3's
+#    live-telemetry query sends to the Prometheus proxy. Same hand-off
+#    mechanism as the traces files: the exec commands read /tmp/sa.token.
+# ---------------------------------------------------------------------------
+METRICS_CONTAINER="$(docker ps --format '{{.Names}}' | grep -E -- '-metrics-[0-9a-f-]+$' | head -1)"
+if [[ -n "$METRICS_CONTAINER" ]]; then
+  printf '%s\n' "$OCP_TOKEN" | docker exec -i "$METRICS_CONTAINER" \
+    sh -c 'cat > /tmp/sa.token && chmod 644 /tmp/sa.token'
+  log "staged /tmp/sa.token in sandbox $METRICS_CONTAINER"
+else
+  log "WARN: metrics sandbox container not found; skip SA token staging"
 fi
