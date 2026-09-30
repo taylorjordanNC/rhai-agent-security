@@ -218,26 +218,7 @@ STATUS=$(openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_nam
   curl -sS --connect-timeout 10 --max-time 30 \
   -o /dev/null -w '%\{http_code\}' \
   https://api.github.com/repos/NVIDIA/OpenShell)
-<<<<<<< HEAD
-echo -e "$GREEN GitHub API HTTP $STATUS$NC"
-if [ "$STATUS" = "403" ]; then
-  RATE_LIMIT=$(openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_name} -- \
-    curl -sI --connect-timeout 10 --max-time 30 \
-    https://api.github.com/repos/NVIDIA/OpenShell | grep -i 'x-ratelimit-remaining: 0' || true)
-  if [ -n "$RATE_LIMIT" ]; then
-    echo -e "$ORANGE PASS WITH NOTE: the proxy allowed the request; GitHub exhausted the shared unauthenticated rate limit (X-RateLimit-Remaining: 0)$NC"
-    echo 'The connection succeeded through the proxy, which is the property under test. Retry after the limit window resets.'
-  else
-    echo -e "$RED FAIL: a 403 without rate-limit headers may be a policy denial; check the gateway events$NC"
-    openshell --gateway {raw_gateway_name} logs {raw_sandbox_name} --since 2m
-    test "$STATUS" = "200"
-  fi
-else
-  test "$STATUS" = "200"
-fi
-=======
 printf 'GitHub API HTTP %s\n' "$STATUS"
->>>>>>> upstream/main
 ----
 
 Expected result: HTTP 200. GET, HEAD, and OPTIONS are allowed by the read-only
@@ -273,31 +254,6 @@ in the rule. The capability was granted to `/usr/bin/curl`, not to the sandbox:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-<<<<<<< HEAD
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
-BINARY_DENIED=false
-if openshell --gateway {raw_gateway_name} sandbox exec \
-  -n {raw_sandbox_name} -- \
-  python3 -c "import urllib.request; urllib.request.urlopen('https://api.github.com/zen', timeout=10)"; then
-  echo -e "$RED ERROR: an unlisted binary reached the allowed host$NC"
-else
-  BINARY_DENIED=true
-  echo -e "$GREEN EXPECTED: binary binding rejected python3$NC"
-fi
-sleep 6
-DENIAL_LOG=$(openshell --gateway {raw_gateway_name} logs \
-  {raw_sandbox_name} --level info --since 30s)
-echo -e "$DENIAL_LOG"
-EVIDENCE_FOUND=false
-if echo -e "$DENIAL_LOG" | grep -Ei 'api\.github\.com' | \
-  grep -Eiq 'deny|denied|blocked'; then
-  EVIDENCE_FOUND=true
-fi
-test "$BINARY_DENIED" = true && test "$EVIDENCE_FOUND" = true
-=======
 openshell --gateway {raw_gateway_name} sandbox exec \
   -n {raw_sandbox_name} -- \
   python3 -c "import urllib.request; urllib.request.urlopen('https://api.github.com/zen', timeout=10)"
@@ -317,7 +273,6 @@ DENIAL_LOG=$(openshell --gateway {raw_gateway_name} logs \
 printf '%s\n' "$DENIAL_LOG"
 printf '%s\n' "$DENIAL_LOG" | grep -Ei 'api\.github\.com' | \
   grep -Eiq 'deny|denied|blocked'
->>>>>>> upstream/main
 ----
 ====
 
@@ -336,30 +291,15 @@ POST_STATUS=$(openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbo
   -X POST -o /dev/null -w '%\{http_code\}' \
   https://api.github.com/repos/octocat/hello-world/issues \
   -H 'Content-Type: application/json' -d '{"title":"blocked-by-policy"}' || true)
-<<<<<<< HEAD
-if [ "$POST_STATUS" = "403" ]; then
-  echo -e "$GREEN POST result: HTTP $POST_STATUS$NC"
-else
-  echo -e "$RED POST result: HTTP $POST_STATUS$NC"
-fi
-=======
 printf 'POST result: HTTP %s\n' "$POST_STATUS"
 ----
->>>>>>> upstream/main
 
 Then inspect the policy evidence:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
 sleep 6
-<<<<<<< HEAD
-DENIAL_LOG=$(openshell --gateway {raw_gateway_name} logs {raw_sandbox_name} --level info --since 30s)
-echo -e "$DENIAL_LOG"
-echo -e "$DENIAL_LOG" | grep -Ei 'api\.github\.com' | \
-  grep -Ei 'POST' | grep -Eiq 'deny|denied|blocked'
-=======
 openshell --gateway {raw_gateway_name} logs {raw_sandbox_name} --level info --since 30s
->>>>>>> upstream/main
 ----
 
 The CONNECT is permitted because `api.github.com` is an allowed host, but the
@@ -420,16 +360,7 @@ STATUS=$(openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_nam
   -X POST -o /dev/null -w '%\{http_code\}' \
   "http://http-echo.{openshell_namespace}.svc.cluster.local:8080/post" \
   -d 'policy=updated')
-<<<<<<< HEAD
-if [ "$STATUS" = "200" ]; then
-  echo -e "$GREEN http-echo HTTP $STATUS$NC"
-else
-  echo -e "$RED http-echo HTTP $STATUS$NC"
-fi
-test "$STATUS" = "200"
-=======
 printf 'http-echo HTTP %s\n' "$STATUS"
->>>>>>> upstream/main
 ----
 
 Expected result: HTTP 200. No sandbox recreation was required — network policy
@@ -552,15 +483,9 @@ else
 fi
 ----
 
-<<<<<<< HEAD
 Filesystem policy is static for a running sandbox. Inspect the `hard_requirement`
-policy before creating the sandbox:
-=======
-Filesystem policy is static for a running sandbox. Create a separate sandbox
-whose startup must fail if Landlock cannot enforce the declared paths —
-`hard_requirement` means the sandbox refuses to start rather than running
-without the filesystem boundary:
->>>>>>> upstream/main
+policy before creating the sandbox — `hard_requirement` means the sandbox
+refuses to start rather than running without the filesystem boundary:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -612,29 +537,10 @@ Run the positive control. A write inside the allowlist must succeed:
 [source,bash,role="execute",subs="attributes+"]
 ----
 POSITIVE_CONTROL=false
-<<<<<<< HEAD
-if openshell --gateway {raw_gateway_name} sandbox exec -n landlock-proof -- \
-  sh -c 'touch /tmp/allowed && rm /tmp/allowed'; then
-  POSITIVE_CONTROL=true
-  echo -e "$GREEN EXPECTED: /tmp write succeeded$NC"
-else
-  echo -e "$RED ERROR: the allowed /tmp control failed$NC"
-fi
-
-LANDLOCK_DENIED=false
-if openshell --gateway {raw_gateway_name} sandbox exec -n landlock-proof -- \
-  touch /var/tmp/openshell-workshop-probe; then
-  echo -e "$RED ERROR: write outside the Landlock allowlist succeeded$NC"
-else
-  LANDLOCK_DENIED=true
-  echo -e "$GREEN EXPECTED: Landlock denied the /var/tmp write$NC"
-fi
-=======
 LANDLOCK_DENIED=false
 openshell --gateway {raw_gateway_name} sandbox exec -n landlock-proof -- \
   sh -c 'touch /tmp/allowed && rm /tmp/allowed' && POSITIVE_CONTROL=true
 ----
->>>>>>> upstream/main
 
 Expected result: the command succeeds. This proves the sandbox can write
 normally inside the declared paths.
@@ -720,18 +626,11 @@ the start of this module. Terminal 1 runs the commands; Terminal 2 streams the
 events as they happen — user-level interaction and operator management side by
 side. Reproduce each earlier control layer while watching the event stream:
 
-<<<<<<< HEAD
-[source,bash,role="execute",subs="attributes+"]
-----
-openshell term --gateway {raw_gateway_name}
-----
-=======
 * default-deny curl (Exercise 1) — the DENIED event for `api.github.com`;
 * unbound-binary python3 read (Exercise 2) — the binary-binding denial;
 * L7 POST to GitHub (Exercise 3) — the method denial;
 * `http-echo` allow, restore, deny (Exercise 4) — ALLOWED flipping back to
   DENIED.
->>>>>>> upstream/main
 
 Each event appears with the sandbox identity, binary, destination, and denial
 reason. This live view is the demo moment: customers see the policy decision
