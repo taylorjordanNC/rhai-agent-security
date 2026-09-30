@@ -1,0 +1,108 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: openshell-saw-setup
+  namespace: openshell-agents
+spec:
+  activeDeadlineSeconds: 10800
+  backoffLimit: 5
+  completionMode: NonIndexed
+  completions: 1
+  parallelism: 1
+  podReplacementPolicy: TerminatingOrFailed
+  suspend: false
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: openshell-saw
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: openshell-saw
+        app.kubernetes.io/part-of: openshell-cnv-fedora
+        app.kubernetes.io/version: 0.1.0
+        helm.sh/chart: openshell-saw-0.1.0
+    spec:
+      containers:
+      - command:
+        - /bin/bash
+        - /scripts/run-setup.sh
+        image: registry.fedoraproject.org/fedora:44
+        imagePullPolicy: IfNotPresent
+        name: setup
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /scripts
+          name: scripts
+          readOnly: true
+        - mountPath: /secrets
+          name: setup-env
+          readOnly: true
+        - mountPath: /provider-secret
+          name: provider-secret
+          readOnly: true
+        - mountPath: /ssh-key
+          name: ssh-key
+          readOnly: true
+        - mountPath: /ws-secrets/inference
+          name: provider-secret-ws
+          readOnly: true
+        - mountPath: /ws-secrets/web-search
+          name: provider-secret-ws-0
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      initContainers:
+      - command:
+        - /bin/bash
+        - -c
+        - "echo \"Waiting for required secrets...\"\ndeadline=$((SECONDS + 600))\n\
+          while true; do\n  all_ready=true\n  for secret in \"openshell-aap-ssh\"\
+          \ \"inference\"; do\n    [[ -z \"${secret}\" ]] && continue\n    if ! [[\
+          \ \"${secret}\" =~ ^[a-z0-9][a-z0-9.-]*$ ]]; then\n      echo \"ERROR: invalid\
+          \ secret name: ${secret}\" >&2\n      exit 1\n    fi\n    if ! kubectl get\
+          \ secret \"${secret}\" -n openshell-agents >/dev/null 2>&1; then\n     \
+          \ echo \"  waiting for secret/${secret}...\"\n      all_ready=false\n  \
+          \  fi\n  done\n  if [[ \"${all_ready}\" == \"true\" ]]; then\n    echo \"\
+          All secrets ready.\"\n    exit 0\n  fi\n  if (( SECONDS > deadline )); then\n\
+          \    echo \"Timed out waiting for secrets\" >&2\n    exit 1\n  fi\n  sleep\
+          \ 10\ndone\n"
+        image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+        imagePullPolicy: Always
+        name: wait-for-secrets
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      restartPolicy: OnFailure
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: openshell-saw-setup
+      serviceAccountName: openshell-saw-setup
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - configMap:
+          defaultMode: 493
+          name: openshell-saw-scripts
+        name: scripts
+      - name: setup-env
+        secret:
+          defaultMode: 420
+          secretName: openshell-saw-setup-env
+      - name: provider-secret
+        secret:
+          defaultMode: 420
+          optional: true
+          secretName: inference
+      - name: ssh-key
+        secret:
+          defaultMode: 384
+          secretName: openshell-aap-ssh
+      - name: provider-secret-ws
+        secret:
+          defaultMode: 420
+          optional: true
+          secretName: inference
+      - name: provider-secret-ws-0
+        secret:
+          defaultMode: 420
+          optional: true
+          secretName: web-search
