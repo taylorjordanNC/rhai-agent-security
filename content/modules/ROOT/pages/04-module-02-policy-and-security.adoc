@@ -106,6 +106,10 @@ Inspect the effective policy first:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
 openshell --gateway {raw_gateway_name} policy get {raw_sandbox_name} --full
 ----
 
@@ -153,20 +157,20 @@ log query, live.
 REQUEST_DENIED=false
 if openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_name} -- \
   curl -fsS --connect-timeout 10 --max-time 30 https://api.github.com/zen; then
-  echo 'ERROR: the default policy allowed egress'
+  echo -e "$RED ERROR: the default policy allowed egress$NC"
 else
   REQUEST_DENIED=true
-  echo 'The request failed; verify the gateway denial record next.'
+  echo -e "$GREEN The request failed; verify the gateway denial record next.$NC"
 fi
 sleep 6
 DENIAL_LOG=$(openshell --gateway {raw_gateway_name} logs {raw_sandbox_name} --since 30s)
-printf '%s\n' "$DENIAL_LOG"
+echo -e "$DENIAL_LOG"
 EVIDENCE_FOUND=false
-if printf '%s\n' "$DENIAL_LOG" | \
+if echo -e "$DENIAL_LOG" | \
   grep -Ei 'api\.github\.com' | grep -Eiq 'deny|denied|blocked'; then
   EVIDENCE_FOUND=true
 else
-  echo 'ERROR: no api.github.com gateway-denial evidence was found'
+  echo -e "$RED ERROR: no api.github.com gateway-denial evidence was found$NC"
 fi
 test "$REQUEST_DENIED" = true && test "$EVIDENCE_FOUND" = true
 ----
@@ -174,7 +178,15 @@ test "$REQUEST_DENIED" = true && test "$EVIDENCE_FOUND" = true
 
 == Exercise 2: Apply the read-only policy
 
-Apply the workshop's bundled copy of the OpenShell read-only policy:
+Inspect the workshop's bundled copy of the OpenShell read-only policy before
+applying it:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+cat {automation_repo}/policies/sandbox-policy-quickstart.yaml
+----
+
+Apply the read-only policy:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -197,6 +209,11 @@ Run an allowed GitHub API read with the granted binary:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+GREEN='\033[0;32m'
+ORANGE='\033[38;5;214m'
+RED='\033[0;31m'
+NC='\033[0m'
+
 STATUS=$(openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_name} -- \
   curl -sS --connect-timeout 10 --max-time 30 \
   -o /dev/null -w '%\{http_code\}' \
@@ -265,6 +282,10 @@ Attempt a write to the GitHub API with the same allowed host and binary:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
 POST_STATUS=$(openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_name} -- \
   curl -sS --connect-timeout 10 --max-time 30 \
   -X POST -o /dev/null -w '%\{http_code\}' \
@@ -330,6 +351,10 @@ Run a harmless POST against the temporary endpoint:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
 STATUS=$(openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_name} -- \
   curl -sS --connect-timeout 10 --max-time 30 \
   -X POST -o /dev/null -w '%\{http_code\}' \
@@ -346,6 +371,10 @@ removed:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
 openshell --gateway {raw_gateway_name} policy set {raw_sandbox_name} \
   --policy {automation_repo}/policies/sandbox-policy-quickstart.yaml \
   --wait
@@ -390,16 +419,16 @@ if openshell --gateway {raw_gateway_name} sandbox exec -n {raw_sandbox_name} -- 
   curl -fsS --connect-timeout 10 --max-time 30 \
   -X POST "http://http-echo.{openshell_namespace}.svc.cluster.local:8080/post" \
   -d 'policy=reverted'; then
-  echo 'ERROR: the reverted policy still allows http-echo'
+  echo -e "$RED ERROR: the reverted policy still allows http-echo$NC"
 else
   REVERT_DENIED=true
-  echo 'Request did not complete; verify the OpenShell denial event next.'
+  echo -e "$GREEN Request did not complete; verify the OpenShell denial event next.$NC"
 fi
 sleep 6
 DENIAL_LOG=$(openshell --gateway {raw_gateway_name} logs {raw_sandbox_name} --level info --since 30s)
-printf '%s\n' "$DENIAL_LOG"
+echo -e "$DENIAL_LOG"
 EVIDENCE_FOUND=false
-if printf '%s\n' "$DENIAL_LOG" | grep -Ei 'http-echo' | \
+if echo -e "$DENIAL_LOG" | grep -Ei 'http-echo' | \
   grep -Eiq 'deny|denied|blocked'; then
   EVIDENCE_FOUND=true
 fi
@@ -441,22 +470,37 @@ a policy problem:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+GREEN='\033[0;32m'
+ORANGE='\033[38;5;214m'
+NC='\033[0m'
+
 LOWEST_KERNEL=$(oc get nodes -o jsonpath='{range .items[*]}{.status.nodeInfo.kernelVersion}{"\n"}\{end\}' | sort -V | head -1)
-printf 'Lowest node kernel: %s\n' "$LOWEST_KERNEL"
+echo -e "Lowest node kernel: $LOWEST_KERNEL"
 if [ "$(printf '%s\n5.13\n' "$LOWEST_KERNEL" | sort -V | head -1)" = "5.13" ]; then
-  echo 'EXPECTED: all nodes meet the Landlock kernel requirement (>= 5.13)'
+  echo -e "$GREEN EXPECTED: all nodes meet the Landlock kernel requirement (>= 5.13)$NC"
 else
-  echo 'WARNING: a node kernel is older than 5.13; hard_requirement cannot start'
+  echo -e "$ORANGE WARNING: a node kernel is older than 5.13; hard_requirement cannot start$NC"
 fi
 ----
 
-Filesystem policy is static for a running sandbox. Create a separate sandbox
-whose startup must fail if Landlock cannot enforce the declared paths —
-`hard_requirement` means the sandbox refuses to start rather than running
-without the filesystem boundary:
+Filesystem policy is static for a running sandbox. Inspect the `hard_requirement`
+policy before creating the sandbox — `hard_requirement` means the sandbox
+refuses to start rather than running without the filesystem boundary:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
+cat {automation_repo}/policies/sandbox-policy-landlock-hard.yaml
+----
+
+Create a separate sandbox whose startup must fail if Landlock cannot enforce
+the declared paths:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
 openshell --gateway {raw_gateway_name} sandbox delete landlock-proof 2>/dev/null || true
 openshell --gateway {raw_gateway_name} sandbox create \
   --name landlock-proof --no-auto-providers \
@@ -479,9 +523,9 @@ for i in $(seq 1 30); do
   sleep 5
 done
 if [ "$LANDLOCK_READY" != true ]; then
-  echo 'ERROR: hard-requirement sandbox did not become Ready; inspect Landlock availability'
+  echo -e "$RED ERROR: hard-requirement sandbox did not become Ready; inspect Landlock availability$NC"
 else
-  echo 'Sandbox started; Landlock availability was sufficient for startup'
+  echo -e "$GREEN Sandbox started; Landlock availability was sufficient for startup$NC"
 fi
 ----
 ====

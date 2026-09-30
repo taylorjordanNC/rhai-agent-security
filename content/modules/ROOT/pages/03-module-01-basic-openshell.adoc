@@ -62,6 +62,8 @@ make -C {automation_repo} install-openshell \
   OPENSHELL_VERSION={openshell_version}
 ----
 
+image::01-openshell-deploy-success.png[OpenShell deploy success,link=self,window=blank,width=700]
+
 The raw OpenShell installation sequence is:
 
 . Installs the Red Hat Agent Sandbox operator through OLM (OpenShift's
@@ -106,6 +108,7 @@ Then register the gateway with the CLI. `gateway add` stores the endpoint,
 `gateway select` makes it the target of every subsequent command, and `status`
 verifies the connection:
 
+
 [source,bash,role="execute",subs="attributes+"]
 ----
 openshell gateway remove {raw_gateway_name} 2>/dev/null || true
@@ -113,6 +116,8 @@ openshell gateway add "http://127.0.0.1:8080" --local --name {raw_gateway_name}
 openshell gateway select {raw_gateway_name}
 openshell status
 ----
+
+image::02-openshell-gateway-success.png[OpenShell gateway success,link=self,window=blank,width=700]
 
 Expected result: `openshell status` lists `{raw_gateway_name}` as the selected
 gateway and reports a healthy connection through `127.0.0.1:8080`.
@@ -148,6 +153,8 @@ oc -n {openshell_namespace} get statefulset,pods,svc,pvc
 oc get crd sandboxes.agents.x-k8s.io
 ----
 
+image::03-openshell-verify.png[OpenShell verify success,link=self,window=blank,width=700]
+
 Expected result, reading the output:
 
 * the `openshell` pod is `Running` and the `openshell-data` PVC is `Bound` —
@@ -177,11 +184,12 @@ OpenShell, not NemoClaw:
 openshell sandbox create --name {raw_sandbox_name} --no-auto-providers --no-tty -- true
 ----
 
+image::04-openshell-create-test-sandbox.png[OpenShell create test sandbox success,link=self,window=blank,width=700]
+
 Reading the flags: `--no-auto-providers` keeps the sandbox free of inference
 providers (the raw OpenShell environment needs no model credential),
 `--no-tty` runs it non-interactively, and `-- true` is a placeholder command
-that keeps the
-sandbox alive after startup.
+that keeps the sandbox alive after startup.
 
 Inspect what was created from both the OpenShell and Kubernetes views:
 
@@ -307,6 +315,8 @@ Then confirm the agent runtime is inside the pod:
 openshell --gateway {raw_gateway_name} sandbox exec \
   -n {raw_openclaw_name} -- openclaw --version
 ----
+
+image::05-openshell-deploy-openclaw.png[OpenShell deploy OpenClaw success,link=self,window=blank,width=700]
 
 Expected result: `openclaw --version` reports the agent runtime version,
 proving the agent process runs inside the sandbox pod — not on the gateway or
