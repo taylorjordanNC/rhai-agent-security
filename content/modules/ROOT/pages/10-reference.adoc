@@ -17,13 +17,18 @@
   NemoClaw runtime integrated into Secure Agent Workspace.
 
 | link:https://github.com/rh-aiservices-bu/agent-harness-in-a-box[agent-harness-in-a-box^]
-| Source of truth for the raw OpenShift evaluation deployment, gateway access,
+| Context reference for raw OpenShift evaluation deployment, gateway access,
   raw OpenShell SCC behavior, and basic sandbox exercises.
 
 | link:https://github.com/mamurak/nemoclaw-openshift-launchable[nemoclaw-openshift-launchable^]
 | Context reference for OpenClaw interaction, configuration, UI forwarding,
   observability, fleet, and incident exercises. Its pinned gateway and Agent
   Sandbox versions are not the compatibility baseline for this workshop.
+
+| link:https://github.com/validatedpatterns-sandbox/secure-agent-workspace[secure-agent-workspace (upstream)^]
+| The upstream Validated Patterns repository for Secure Agent Workspace. The
+  workshop fork below branches from it; use it for the pattern itself, its
+  releases, and upstream changes and issues.
 
 | link:https://github.com/taylorjordanNC/secure-agent-workspace[secure-agent-workspace^]
 | Source of truth for the cluster NemoClaw/OpenClaw path: KubeVirt VM isolation,

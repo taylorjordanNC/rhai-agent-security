@@ -4,7 +4,6 @@ AUTOMATION_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 HARNESS_DIR := $(AUTOMATION_DIR)/openshell-env
 ARGOCD_DIR := $(AUTOMATION_DIR)/argocd
 FLEET_DIR := $(AUTOMATION_DIR)/fleet
-ROOT_APP ?= rhai-agent-security
 CAPSTONE_APP ?= module-7-prereqs
 GITOPS_NS ?= openshift-gitops
 
@@ -23,10 +22,10 @@ help:
 	  '  make prerequisites       Check required local tools and cluster access' \
 	  '  make install-openshell   Install the raw OpenShell evaluation gateway' \
 	  '  make openshell-security-test   Run the sandbox control-layer security test' \
-	  'Workshop GitOps (app-of-apps):' \
-	  '  make capstone-bootstrap  One-time apply of the root app-of-apps Application' \
-	  '  make capstone-status     Show the root, capstone child, and seed Job status' \
-	  '  make capstone-teardown   Delete the root (finalizers cascade to children)' \
+	  'Workshop GitOps (capstone child):' \
+	  '  make capstone-bootstrap  One-time apply of the capstone child Application' \
+	  '  make capstone-status     Show the capstone child and seed Job status' \
+	  '  make capstone-teardown   Delete the capstone child Application' \
 	  'Fleet SAW deployment (RHDP orders):' \
 	  '  make fleet-install       Loop the SAW install over clusters (fleet/clusters.csv)' \
 	  '  make fleet-status        Poll SAW + workshop resources per cluster'
@@ -50,15 +49,14 @@ openshell-teardown:
 	bash $(HARNESS_DIR)/teardown.sh
 
 capstone-bootstrap:
-	oc apply -f $(ARGOCD_DIR)/root.yaml
+	oc apply -f $(ARGOCD_DIR)/templates/10-capstone.yaml
 
 capstone-status:
-	oc get application $(ROOT_APP) -n $(GITOPS_NS) 2>/dev/null || true
 	oc get application $(CAPSTONE_APP) -n $(GITOPS_NS) 2>/dev/null || true
 	oc get pods -n openshell -l app=incident-data-seed -o wide 2>/dev/null || true
 
 capstone-teardown:
-	oc delete application $(ROOT_APP) -n $(GITOPS_NS) --wait=false || true
+	oc delete application $(CAPSTONE_APP) -n $(GITOPS_NS) --wait=false || true
 
 fleet-install:
 	bash $(FLEET_DIR)/fleet-install.sh $(FLEET_ARGS)

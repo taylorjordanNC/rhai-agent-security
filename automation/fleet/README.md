@@ -10,12 +10,12 @@ fork logic.
 
 | Path | What | Where |
 |---|---|---|
-| RHDP order gitops path | workshop prerequisites (capstone child) | `../argocd/apps` — the order points Argo at that path |
+| RHDP order gitops path | workshop prerequisites (capstone child) | `../argocd` — the order deploys the workshop chart |
 | Fleet script (this dir) | SAW install per cluster | `fleet-install.sh` |
 | Manual (module 3) | participant-run SAW install | the SAW fork's documented procedure |
 
-The workshop root app-of-apps works in any order: apply the RHDP pointer at
-order time and the capstone child retries until this script has installed
+The workshop GitOps (RHDP chart) works in any order: the order deploys the
+capstone child at order time and it retries until this script has installed
 SAW on the cluster.
 
 ## One-time setup (shared across all clusters)
@@ -45,11 +45,20 @@ and keep it off shared hosts.
 
 ```bash
 ./fleet-install.sh                       # sequential, apply-and-move-on
+./fleet-install.sh --only workshop-01    # bootstrap ONE cluster (facilitator
+                                         # remedy): install, then block until the
+                                         # module-7-prereqs Application is
+                                         # Synced/Healthy — participants proceed
+                                         # the moment it returns
 ./fleet-install.sh --jobs 5              # 5 parallel workers
 ./fleet-install.sh --wait                # block per cluster until the setup Job completes
 ./fleet-install.sh --no-emulation        # KVM-capable clusters only
 ./fleet-install.sh --dry-run             # print the plan, change nothing
 ```
+
+Even a single cluster goes through `clusters.csv`: `--only NAME` matches the
+`name` column (exactly one row required), and `fleet-status.sh` reads the
+same file.
 
 Per cluster the script runs the fork's documented steps, in order:
 `make copy-images` → `./pattern.sh make install` → HCO software-emulation
@@ -84,6 +93,47 @@ install breaks on arm64 hosts.
 
 Shows Argo CD Applications (sync/health), the SAW VM phase, the setup Job,
 and the workshop namespaces per cluster.
+
+The gate (`--gate`) passes apps that are Healthy even when OutOfSync — the
+SAW pattern and the workshop chart both manage parity-declared objects
+(`rhods-operator`, `kubevirt-hyperconverged`), so expected annotation drift
+keeps those apps OutOfSync while Healthy. Only a not-Healthy app (Degraded,
+Progressing, Missing) or a missing workshop namespace fails the gate.
+
+## Troubleshooting
+
+**Golden-image import stuck in ImagePullBackOff** (VM never provisions, DV
+`*-golden` phase ImportScheduled): the setup Job's golden-image import pulls
+`:latest` from the internal registry. Fork revisions before the mirror-tag
+fix push only the pinned version tag, so `:latest` never exists. Tag it
+manually and the crash-looping CDI importer retries:
+
+```bash
+oc tag openshell-agents/openshell-gateway-docker:<version> \
+  openshell-agents/openshell-gateway-docker:latest
+```
+
+Fixed upstream in the fork (`fix(mirror): tag mirrored images as :latest`)
+— only needed on clusters pinned to older fork revisions.
+
+**Agent model calls (the SAW inference path)**: the gateway-side provider is
+wired for the supported provider types — the default is NVIDIA's
+`nvidia/nemotron-3-super-120b-a12b` via the shared NGC key
+(`provider: build` in `values-secret.yaml`), served at
+`integrate.api.nvidia.com`. Verified live: the key works at that endpoint
+and the model completes. Two limitations found during a live run, both in
+the OpenShell gateway/nemoclaw plugin (upstream, not this repository):
+
+* the plugin registers the provider **type's** default endpoint and ignores
+  a re-pointed `endpoint` config — custom OpenAI-compatible endpoints (e.g.
+  a Model-as-a-Service gateway) do not work end-to-end;
+* a provider credential update does **not** propagate to existing sandboxes —
+  the sandbox's injected `NVIDIA_API_KEY` env is frozen at sandbox creation,
+  so rotate credentials by re-creating the sandboxes (or provision fresh
+  clusters with the final key).
+
+Module 8 is unaffected: the guardrails chart calls its Model-as-a-Service
+endpoint directly, no gateway-side provider involved.
 
 ## Environment knobs
 

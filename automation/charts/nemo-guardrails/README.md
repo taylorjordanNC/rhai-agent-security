@@ -28,6 +28,10 @@ To upgrade after changing values:
 helm upgrade nemo-guardrails . -n <namespace>
 ```
 
+Note: Helm discards values supplied at install time when an upgrade introduces
+any new `--set` flag. Repeat the full model connection on every upgrade
+(`--set llm.baseUrl=... --set llm.modelName=... --set llm.apiKey=...`).
+
 ## RBAC
 
 The TrustyAI operator automatically creates:
@@ -55,7 +59,7 @@ All values are at the top level in `values.yaml` (not nested). Key fields:
 | `contentSafety.deploy` | Set `true` to deploy the NemoGuard content safety detector model (requires GPU) |
 | `contentSafety.modelUri` | OCI URI for the content safety model weights |
 | `llamaGuard.enabled` | Set `true` to wire a remote Llama Guard model into the rails (no GPU needed): adds a `llama_guard` model entry, the `llama guard check` flows, and the moderation prompts to the rendered config |
-| `llamaGuard.baseUrl` | OpenAI-compatible endpoint serving the Llama Guard model |
+| `llamaGuard.baseUrl` | OpenAI-compatible endpoint serving the Llama Guard model. Placeholder by default; set it at upgrade time together with `llamaGuard.apiKey` (your facilitator provides both) |
 | `llamaGuard.modelName` | Served Llama Guard model name (default `Llama-Guard-3-1B`) |
 | `llamaGuard.apiKey` | API key for the Llama Guard endpoint — supplied at install time, never committed. If set (with `enabled`), the chart creates a `<name>-llama-guard-credentials` Secret and injects the key as `llamaGuard.apiKeyEnvVar` |
 | `llamaGuard.apiKeyEnvVar` | Environment variable name carrying the Llama Guard API key (default `LLAMA_GUARD_API_KEY`) |

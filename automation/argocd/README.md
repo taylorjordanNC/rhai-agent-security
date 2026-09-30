@@ -1,39 +1,39 @@
-# Workshop GitOps — Argo CD app-of-apps
+# Workshop GitOps — Argo CD child Applications
 
-`root.yaml` is the workshop's root app-of-apps Application; `apps/` holds the
-child Applications it manages (currently `10-capstone.yaml`, the Module 7
-capstone prerequisites), and `capstone/` is the GitOps sync source that the
-capstone Application deploys. The SAW deployment is deliberately *not* a child
-here: it is the SAW fork's Validated Patterns deployment — scripted by
-`../fleet/` or run by participants in module 3.
+`automation/argocd/` is a Helm chart (`Chart.yaml`, `values.yaml`) — the RHDP
+field-content deployment vehicle. `templates/10-capstone.yaml` is the child
+Application it deploys (currently `module-7-prereqs`, the Module 7 capstone
+prerequisites), and `capstone/` is the GitOps sync source that the child
+deploys. The SAW deployment is deliberately *not* a child here: it is the SAW
+fork's Validated Patterns deployment — scripted by `../fleet/` or run by
+participants in module 3.
 
-## Point Argo at one path
+## Deploy the child
 
-ONE pointer per cluster — either the RHDP order's gitops path targets
-`automation/argocd/apps` (the order creates the root itself), or apply the
-shipped root once:
+On RHDP orders the order's gitops path deploys the chart — the child lands in
+the cluster's `openshift-gitops` instance with no manual step. On a cluster
+without the order pointer, apply the child once:
 
 [source,bash]
 ----
-oc apply -f automation/argocd/root.yaml
+oc apply -f automation/argocd/templates/10-capstone.yaml
 # or, via make:
 make -C automation capstone-bootstrap
 ----
 
-Never use both on the same cluster — two roots managing the same children
-fight over ownership. Children that depend on SAW (capstone) hold in retry
-until SAW and the RHOAI MLflow operator are healthy — no manual re-apply.
+On an order-managed cluster the chart owns the Application; don't double-apply
+it. The child holds in retry until SAW and the RHOAI MLflow operator are
+healthy — no manual re-apply.
 
 ## Argo instance
 
 The default is `openshift-gitops` (the GitOps operator default instance).
-For a cluster where Argo CD runs elsewhere, swap the namespace in one pass
-across the root and every child:
+For a cluster where Argo CD runs elsewhere, swap the namespace in one pass:
 
 [source,bash]
 ----
 sed -i.bak 's/namespace: openshift-gitops/namespace: vp-gitops/g' \
-  root.yaml apps/*.yaml && rm -f root.yaml.bak apps/*.bak
+  templates/10-capstone.yaml && rm -f templates/10-capstone.yaml.bak
 ----
 
 ## Decay playbook
@@ -55,5 +55,4 @@ structurally. If the SAW fork or its framework changes:
 | `module-7-prereqs` | `automation/argocd/capstone` | SAW up (retry), RHOAI MLflow operator |
 
 Add future children (e.g. the NeMo Guardrails chart) as Application manifests
-in `apps/` — the root's `directory.include: "*.yaml"` picks them up
-automatically.
+in `templates/` — the chart deploys them the same way as `10-capstone.yaml`.

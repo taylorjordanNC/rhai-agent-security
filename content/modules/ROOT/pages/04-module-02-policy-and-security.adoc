@@ -4,8 +4,10 @@
 This is the core OpenShell exercise. An agent with a shell and network access
 needs controls that live outside the model — and a customer must be able to
 *prove* what the agent could and could not reach, not just assert it. You will
-observe default-deny egress, apply the repository's read-only GitHub policy,
-prove that reads succeed while writes remain blocked by L7 enforcement, and
+observe default-deny egress (egress is outbound network traffic), apply the
+repository's read-only GitHub policy, prove that reads succeed while writes
+remain blocked by L7 enforcement (L7 is the HTTP layer, where a proxy can see
+the actual request — method, path, body — not just the destination), and
 inspect the audit evidence. The important lesson is not just that OpenShell
 denies; it is that the policy decision is visible, specific, and testable
 without restarting the sandbox. That is the evidence a compliance review or
@@ -20,11 +22,10 @@ filesystem policy is verified in a separate sandbox because Landlock is applied
 at sandbox startup.
 
 Landlock is the mechanism behind the filesystem boundary: a Linux kernel
-security feature in which a process declares the filesystem paths it may
+security feature where a process declares which filesystem paths it may
 access, and the kernel enforces that declaration. A process can narrow its own
-access but never broaden it, so OpenShell uses it to enforce the filesystem
-rules of the sandbox policy at the kernel boundary — unlike the network
-boundary, there is no enforcement proxy between the process and the filesystem.
+access but never broaden it. Unlike the network boundary, there is no proxy in
+between — the kernel itself does the enforcing.
 
 == Learning objectives
 
@@ -92,6 +93,11 @@ TUI quick reference:
 
 == Exercise 1: Observe default deny
 
+How enforcement works here, in two sentences: network traffic from the sandbox
+passes through a proxy at the gateway that checks every request against your
+policy, and the kernel itself guards file access with no proxy in between.
+This exercise watches the first half; Exercise 5 tests the second.
+
 The new sandbox starts with default-deny network policy. Its filesystem policy
 still permits the normal work paths such as `/sandbox` and `/tmp`; this module
 focuses on the network boundary.
@@ -132,7 +138,8 @@ sleep 6
 openshell --gateway {raw_gateway_name} logs {raw_sandbox_name} --since 30s
 ----
 
-Expected result: an OCSF event naming `api.github.com`, the calling binary
+Expected result: an OCSF event (OCSF is a standard format for security-event
+logs) naming `api.github.com`, the calling binary
 (`/usr/bin/curl`), and the denial reason. Those three fields are the audit
 evidence: the event answers *what was attempted*, *by what*, and *why it was
 refused* — exactly what a reviewer needs. A request that fails with no matching
@@ -193,9 +200,10 @@ Expected result: the effective policy now shows a read-only REST rule scoped to
 `/usr/bin/curl` for `api.github.com`, without recreating the sandbox.
 
 An allow rule has multiple dimensions:
-destination, protocol, HTTP access mode, and calling binary. A hostname alone
-is not the capability grant — reading the effective rule line by line is how
-you explain a capability to a reviewer.
+destination, protocol, HTTP access mode, and calling binary. That last one is
+*binary binding*: the grant goes to a specific program, not to the sandbox as
+a whole. A hostname alone is not the capability grant — reading the effective
+rule line by line is how you explain a capability to a reviewer.
 
 Run an allowed GitHub API read with the granted binary:
 
@@ -382,7 +390,8 @@ the workload keeps running, verify the result, then restore known-good state.
 
 Use a precise live update to add a temporary read-write REST endpoint while the
 sandbox remains running. The target is the in-cluster `http-echo` service the
-raw OpenShell environment deploys, so no external host is required:
+raw OpenShell environment deploys — the tiny echo-back service from Module 1 —
+so no external host is required:
 
 [source,bash,role="execute",subs="attributes+"]
 ----

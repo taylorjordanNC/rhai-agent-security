@@ -7,8 +7,14 @@ name: nemo-guardrails
 # or a remote Model-as-a-Service gateway). The rendered config.yaml references
 # these values, so they are the single source of truth for the model connection.
 llm:
-  baseUrl: "https://maas.apps.ocp.cloud.rhai-tmm.dev/prelude-maas/glm-53-flash/v1"
-  modelName: "glm-53-flash"
+  # Required: set BOTH at install time with --set llm.baseUrl=... and
+  # --set llm.modelName=..., and repeat every llm value on each upgrade —
+  # Helm discards install-time --set values when an upgrade adds any new
+  # --set flag. Participants supply their own OpenAI-compatible endpoint;
+  # the values below are placeholders so the chart still renders and lints
+  # without overrides.
+  baseUrl: "https://REPLACE-WITH-YOUR-MODEL-ENDPOINT/v1"
+  modelName: "REPLACE-WITH-YOUR-MODEL-NAME"
   engine: openai
   # API key for the LLM endpoint. Supplied by the user at install time (e.g.
   # --set llm.apiKey="$LLM_API_KEY"); never commit a key to this file. If set,
@@ -33,6 +39,10 @@ config: |
     - type: main
       engine: {{ .Values.llm.engine }}
       model: {{ .Values.llm.modelName }}
+      # The server's LLM HTTP client reads the key from the env var named
+      # here (model-level, like the llama_guard entry) — without this it
+      # never sees the injected OPENAI_API_KEY and every model call 401s.
+      api_key_env_var: {{ .Values.llm.apiKeyEnvVar }}
       parameters:
         base_url: "{{ .Values.llm.baseUrl }}"
   {{- if .Values.llamaGuard.enabled }}
@@ -177,9 +187,13 @@ contentSafety:
 # --------------------------------------------------------------------------
 llamaGuard:
   enabled: false
-  baseUrl: "https://maas-rhdp.apps.maas.redhatworkshops.io/v1"
+  # Required when enabled: set BOTH at upgrade time with
+  # --set llamaGuard.baseUrl=... and --set llamaGuard.apiKey=...
+  # The facilitator provides the endpoint and key; the value below is a
+  # placeholder so the chart still renders and lints without overrides.
+  baseUrl: "https://REPLACE-WITH-YOUR-LLAMA-GUARD-ENDPOINT/v1"
   modelName: "Llama-Guard-3-1B"
-  # API key for the Llama Guard endpoint. Supplied by the user at install time
+  # API key for the Llama Guard endpoint. Supplied by the user at upgrade time
   # (e.g. --set llamaGuard.apiKey="$LLAMA_GUARD_API_KEY"); never commit a key
   # to this file. If set, the chart creates a Secret and injects the key into
   # the guardrails pod as this environment variable.

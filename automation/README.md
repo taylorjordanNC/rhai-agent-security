@@ -1,13 +1,13 @@
 = Workshop Automation
 
 This directory contains the raw OpenShell sandbox environment installer, the
-canonical policy used by the workshop, the workshop GitOps app-of-apps (with
-the capstone manifests it deploys), and the fleet SAW deployment scripts.
+canonical policy used by the workshop, the workshop GitOps chart (with the
+capstone manifests it deploys), and the fleet SAW deployment scripts.
 
 | Directory | What it holds
 | `openshell-env/` | raw OpenShell sandbox environment scripts: install, verify, teardown, and the sandbox security test
 | `policies/` | the pinned sandbox policies the workshop applies
-| `argocd/` | the workshop GitOps app-of-apps (`root.yaml`, `apps/`) and the capstone manifests it deploys (`capstone/`)
+| `argocd/` | the workshop GitOps chart (`Chart.yaml`, `values.yaml`, `templates/`) and the capstone manifests it deploys (`capstone/`)
 | `fleet/` | multi-cluster SAW deployment scripts for RHDP orders
 | `bootstrap/` | local CLI install and the pre-flight check
 | `charts/` | the Helm charts modules install (currently `nemo-guardrails`)
@@ -16,28 +16,25 @@ Secure Agent Workspace deployment assets are not copied into this directory.
 Follow the workshop instructions from the `saw-emulation-fixes` branch of the
 `taylorjordanNC/secure-agent-workspace` fork.
 
-== Workshop GitOps (app-of-apps)
+== Workshop GitOps (RHDP chart)
 
-`argocd/` is the workshop's Argo CD entry point: `argocd/root.yaml` is the
-root app-of-apps Application, `argocd/apps/` holds the child Applications
-it manages (currently `module-7-prereqs`, the Module 7 capstone
-prerequisites), and `argocd/capstone/` is the sync source those Applications
-deploy. The SAW deployment is deliberately *not* a child here — it is
-the SAW fork's Validated Patterns deployment (scripted by `fleet/` or run by
-participants in module 3).
+`argocd/` is the workshop's RHDP field-content chart: the order's gitops path
+deploys it, and its template (`argocd/templates/10-capstone.yaml`) creates the
+`module-7-prereqs` child Application (the Module 7 capstone prerequisites).
+`argocd/capstone/` is the sync source that child deploys. The SAW deployment
+is deliberately *not* a child here — it is the SAW fork's Validated Patterns
+deployment (scripted by `fleet/` or run by participants in module 3).
 
-Point Argo at one path per cluster — either the RHDP order's gitops path
-targets `automation/argocd/apps` (the order creates the root), or apply the
-shipped root once:
+On a cluster without the order pointer, apply the child once:
 
 [source,bash]
 ----
-oc apply -f automation/argocd/root.yaml
+make -C automation capstone-bootstrap
 ----
 
-Pick one pointer per cluster; two roots managing the same children fight over
-ownership. Children that depend on SAW hold in retry until SAW and the RHOAI
-MLflow operator are healthy — no manual re-apply.
+On an order-managed cluster the chart owns the Application; don't double-apply
+it. The child holds in retry until SAW and the RHOAI MLflow operator are
+healthy — no manual re-apply.
 
 The default Argo instance is `openshift-gitops` (the GitOps operator default).
 For a cluster where Argo CD runs elsewhere, swap the namespace in one pass:
@@ -45,7 +42,8 @@ For a cluster where Argo CD runs elsewhere, swap the namespace in one pass:
 [source,bash]
 ----
 sed -i.bak 's/namespace: openshift-gitops/namespace: vp-gitops/g' \
-  automation/argocd/root.yaml automation/argocd/apps/*.yaml
+  automation/argocd/templates/10-capstone.yaml && \
+  rm -f automation/argocd/templates/10-capstone.yaml.bak
 ----
 
 If the SAW fork or its Validated Patterns framework changes, update only the

@@ -3,7 +3,10 @@
 
 Modules 1-2 proved each control on a pod boundary. This module moves the same
 agent into the production shape customers deploy: a dedicated VM with identity,
-secrets, and GitOps governance around it. The validation flow is also a
+secrets, and GitOps governance around it. Why a VM: a pod is a process on a
+machine shared with other workloads; a VM is its own machine with its own
+kernel, so a compromised agent has to escape an entire operating system, not
+just a container. The validation flow is also a
 platform admin's day-2 checklist — the same steps to run when you inherit or
 demo an environment.
 
@@ -46,9 +49,10 @@ exercise maps onto one of their components:
 |===
 
 The standalone `nemoclaw onboard` workflow is not used because the runtime's
-lifecycle job is performed at deploy time: the BOM configures the NemoClaw
-runtime in the VM, and its setup Job onboards OpenClaw and wires the inference
-provider through the OpenShell gateway. Module 1 showed OpenClaw running on the
+lifecycle job is performed at deploy time: the BOM (bill of materials — the
+manifest listing exactly which agent image and components ship) configures the
+NemoClaw runtime in the VM, and its setup Job onboards OpenClaw and wires the
+inference provider through the OpenShell gateway. Module 1 showed OpenClaw running on the
 raw OpenShell pod boundary; this module shows the same agent inside the
 production-shaped VM boundary with the runtime, OIDC, and secrets around it.
 
@@ -97,7 +101,10 @@ the login page. The realm roles embedded in the issued token
 (`realm_access.roles`) are how the gateway identifies you; `make
 openshell-saw-configure-gateway` caches that token for the CLI.
 
-Workspace membership is not automatic for human identities. The SAW setup Job
+Workspace membership is not automatic for human identities. Logging in gets
+you a token, but the gateway separately checks a per-workspace member list
+before it lets you touch a workspace — and the automated setup only added the
+machine identity, not you. The SAW setup Job
 provisions workspaces and grants membership only to the in-VM
 `openshell-client` service identity, so your OIDC identity starts with no
 membership in `{saw_workspace}` or `default`. The first workspace-scoped CLI
@@ -215,7 +222,8 @@ OPENSHELL_SAW_NAME={saw_gateway_name} \
 ----
 
 The target uses `openshell sandbox exec` to start `openclaw tui` in the selected
-workspace. The agent reaches the virtual `inference.local` route; the
+workspace. The agent reaches the virtual `inference.local` route — a name the
+gateway resolves to itself, whatever real model sits behind it; the
 gateway-side provider holds the upstream endpoint and credential. The
 standalone `nemoclaw onboard` workflow is not used.
 
@@ -273,6 +281,12 @@ without separately resolving and pinning their registry digests.
 The request path is:
 
 `OpenClaw -> inference.local -> supervisor -> OpenShell gateway in the SAW VM -> provider`.
+
+Read it hop by hop: the agent asks for the model; `inference.local` is the
+stand-in name it dials; the supervisor inside the sandbox hands the request to
+the OpenShell gateway in the VM; the gateway — the only place the real
+endpoint and credential live — forwards it upstream. Each hop is a boundary
+you have already inspected in this module.
 
 The real endpoint and credential remain gateway-side. Verify this boundary from
 the effective provider configuration and sandbox environment before relying on

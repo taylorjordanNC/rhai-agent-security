@@ -25,16 +25,15 @@ raw OpenShell pod boundary to the production-shaped Secure Agent Workspace VM:
 * `automation/` contains the raw OpenShell sandbox environment scripts and
   pinned policies used by
   the raw OpenShell modules (1, 2, and the optional Security CTF), the workshop
-  GitOps app-of-apps, and the fleet SAW deployment scripts.
-* `automation/argocd/` is the workshop's Argo CD entry point (app-of-apps):
-  `root.yaml` is the root Application and `apps/` holds the children it
-  manages — currently `module-7-prereqs`, the Module 7 capstone
-  prerequisites. Point the RHDP order's gitops path at `automation/argocd/apps`
-  or apply the root once with `make -C automation capstone-bootstrap`; the
-  capstone child retries until the SAW deployment and the RHOAI MLflow
-  operator are healthy. `automation/argocd/capstone/` holds the
-  capstone environment (demo shop, MLflow instance, telemetry proxy, incident
-  console, and the incident-data seed job).
+  GitOps chart, and the fleet SAW deployment scripts.
+* `automation/argocd/` is the workshop's RHDP field-content chart: the order's
+  gitops path deploys it, and its template creates the `module-7-prereqs`
+  child Application — the Module 7 capstone prerequisites. On a cluster
+  without the order pointer, apply the child once with `make -C automation
+  capstone-bootstrap`; the capstone child retries until the SAW deployment
+  and the RHOAI MLflow operator are healthy. `automation/argocd/capstone/`
+  holds the capstone environment (demo shop, MLflow instance, telemetry
+  proxy, incident console, and the incident-data seed job).
 * `automation/fleet/` loops the SAW fork's documented install over ~50 RHDP
   clusters (the **SAW as script** path); participants run the same procedure
   manually in module 3.

@@ -1,11 +1,11 @@
 # Module 7 capstone prerequisites — Argo CD child Application.
 #
-# Managed by the workshop root app-of-apps (automation/argocd/root.yaml): the
-# RHDP order's gitops path or a one-time `oc apply -f root.yaml` creates the
-# root, which then creates this child from this directory. To manage it
-# directly without the root:
+# Deployed by the RHDP field-content chart (automation/argocd — Chart.yaml +
+# values.yaml): the order's gitops path renders this template and creates the
+# child directly in the cluster's openshift-gitops instance. To manage it
+# manually without the order:
 #
-#   oc apply -f automation/argocd/apps/10-capstone.yaml
+#   oc apply -f automation/argocd/templates/10-capstone.yaml
 #
 # The Application watches this repository's automation/argocd/capstone
 # directory. Sync waves order the components: openshell namespace (0), demo

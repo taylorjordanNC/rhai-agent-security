@@ -64,9 +64,13 @@ gate_check() { # uses the current oc context; 0 = cluster passes the gate
   fi
   total=$(echo "$apps" | wc -l | tr -d ' ')
   # oc custom-columns pads columns to fixed width — match on any whitespace.
-  bad=$(echo "$apps" | grep -cvE 'Synced[[:space:]]+Healthy' || true)
+  # OutOfSync+Healthy passes: the SAW pattern and the workshop chart both
+  # manage parity-declared objects (rhods-operator, kubevirt-hyperconverged),
+  # so expected annotation drift keeps those apps OutOfSync while Healthy —
+  # that churn is the ignoreDifferences design, not a broken install.
+  bad=$(echo "$apps" | grep -cvE '^(Synced|OutOfSync)[[:space:]]+Healthy$' || true)
   if [[ "$bad" -gt 0 ]]; then
-    echo "  [gate] FAIL — $bad of $total Argo CD Applications not Synced/Healthy"
+    echo "  [gate] FAIL — $bad of $total Argo CD Applications not Healthy"
     return 1
   fi
   if ! oc get ns demo openshell "$SAW_NS" >/dev/null 2>&1; then

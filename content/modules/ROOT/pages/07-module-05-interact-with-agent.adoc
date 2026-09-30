@@ -50,7 +50,8 @@ openshell --gateway {saw_gateway_name} sandbox exec \
 ----
 
 Expected result: the command fails. The path is outside the Landlock
-allowlist, so the kernel refuses the write.
+allowlist — the kernel-level filesystem rule from Module 2 — so the kernel
+refuses the write.
 
 .Cleanup for the unexpected-success case
 [%collapsible]
@@ -89,7 +90,10 @@ event. The failing `touch` itself is the evidence.
 
 == Exercise 3: Inspect managed capabilities
 
-Inspect the governance profiles vended by the interceptor. The authenticated
+The *governance interceptor* is the platform's policy gatekeeper: it sits
+between the gateway and sandbox operations, signs each sandbox's policy, and
+*vends* — serves up — the provider profiles agents may use. Inspect the
+profiles it vends. The authenticated
 profile-list operation proves authenticated reads of the governance data work
 for your identity:
 
@@ -115,7 +119,8 @@ openshell --gateway "$OPENSHELL_SAW_NAME" provider create \
 ----
 
 Expected result: the request is rejected with an error naming the unvended
-type. This verifies fail-closed governance for the intercepted
+type. This verifies fail-closed governance — anything outside the governance
+baseline is refused, never silently allowed — for the intercepted
 `CreateProvider` operation. It does not imply that every operation in the VM
 traverses the interceptor.
 
@@ -153,12 +158,14 @@ OpenShell policy, not an OpenClaw prompt or workspace file.
 
 The OpenClaw Control UI is the agent's browser face: chat with the agent,
 watch tool activity live, and approve device pairings. The setup job wires
-the whole path — it starts the agent's gateway daemon inside the sandbox,
-configures the allowed browser origin from the dashboard Route, and installs
+the whole path — it starts the agent's gateway daemon (the agent's background
+WebSocket service) inside the sandbox, configures the allowed browser origin
+from the dashboard Route (the OpenShift URL that exposes it), and installs
 a systemd unit on the gateway VM that forwards `{saw_gateway_name}-dashboard`
 route traffic into the sandbox with the gateway's native `openshell forward`
-RPC. The daemon binds loopback inside the sandbox, so the Route only works
-through that authenticated forward; no manual port plumbing is involved.
+RPC. The daemon binds loopback (listens only on the sandbox's own address), so
+the Route only works through that authenticated forward; no manual port
+plumbing is involved.
 
 Confirm the daemon is listening inside the sandbox:
 
@@ -170,7 +177,8 @@ openshell --gateway {saw_gateway_name} sandbox exec \
 ----
 
 Expected result: a listening line on port 18789 — the agent's WebSocket gateway
-bound to loopback inside the sandbox. `daemon not listening` means the setup
+bound to loopback inside the sandbox (only the sandbox itself can reach it).
+`daemon not listening` means the setup
 Job's wiring did not finish; fix that before opening the UI.
 
 Then acquire the UI token. The token authenticates the UI session and is a

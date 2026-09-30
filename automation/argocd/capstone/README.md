@@ -2,10 +2,11 @@
 
 The components module 7 (SRE Copilot Capstone) needs up **before workshop
 participants proceed** live here as Argo CD–managed manifests. This directory
-is the GitOps source for the `module-7-prereqs` child Application, managed by
-the workshop root app-of-apps (`../root.yaml`), which points at
-`automation/argocd/capstone` on `taylorjordanNC/rhai-agent-security@main`
-in the cluster's `openshift-gitops` instance.
+is the GitOps source for the `module-7-prereqs` child Application, deployed
+by the workshop chart (`../Chart.yaml` — the RHDP field-content deployment),
+which watches `automation/argocd/capstone` on
+`taylorjordanNC/rhai-agent-security@main` in the cluster's `openshift-gitops`
+instance.
 
 | Component | Sync wave | Namespace | Purpose |
 |---|---|---|---|
@@ -32,8 +33,8 @@ in the cluster's `openshift-gitops` instance.
 
 ## Bootstrap (one-time)
 
-The root app-of-apps creates this child. Either the RHDP order's gitops path
-points at `automation/argocd/apps`, or apply the root once:
+The RHDP order's chart creates this child. On a cluster without the order
+pointer, apply the child once:
 
 ```bash
 make -C automation capstone-bootstrap
