@@ -37,7 +37,7 @@ between — the kernel itself does the enforcing.
 
 == Establish the test context
 
-Run this module in the Terminal tab from the `rhai-agent-security` repository
+Run this module in the terminal from the `rhai-agent-security` repository
 root. Select the local gateway explicitly so the commands cannot operate on the
 SAW gateway:
 

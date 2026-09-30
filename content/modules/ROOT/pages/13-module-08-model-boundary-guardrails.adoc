@@ -12,8 +12,6 @@ OpenAI-compatible proxy in front of the model. Clients call the guardrails
 server, not the model. Input rails run before the model call, output rails run
 on the response, and the model credential never reaches the caller.
 
-*Estimated time:* 70-80 minutes
-
 == Technical context
 
 Every request flows through the guardrails server in one direction. Rails are
@@ -21,7 +19,7 @@ checkpoints at fixed stages of that flow:
 
 [mermaid]
 ----
-flowchart LR
+flowchart TD
     C[Client application] -->|OpenAI-compatible API| S[Guardrails server]
     S --> IR[Input rails<br>regex, PII, moderation]
     IR -->|blocked| R[Refusal, HTTP 200]
@@ -121,10 +119,10 @@ API requests must carry the configured model name.
 == Prerequisites
 
 * OpenShift AI with the TrustyAI component `Managed` in the DataScienceCluster.
-  This is the foundation deployment; this module does not install it.
+  This is the foundation deployment; this module does not install it - this is preconfigured as part of the gitops deployment in the `rhai-agent-security/automation/argocd` folder and setup in your cluster before beginning the workshop.
 * A remote OpenAI-compatible model endpoint, the model name it serves, and
   your own API key for it. The workshop pins a Model-as-a-Service endpoint —
-  obtain your key from the MaaS platform, or use any OpenAI-compatible
+  obtain your key from your chosen MaaS platform, or use any OpenAI-compatible
   endpoint and key you hold. Do not commit the key to any file. This module
   is standalone: the SAW gateway's inference key does not apply here.
 * `oc` authenticated to the cluster, Helm 3.x, `curl`, and Python 3 with
@@ -453,7 +451,7 @@ done
 kill $PF_PID
 ----
 
-Read the two results as a consultant would: a pattern-based rail gives you
+Read the two results: a pattern-based rail gives you
 deterministic, character-exact enforcement with near-zero latency and no
 model cost, but it only catches what you spelled out. Model-backed rails
 (Exercise 8) catch what you did not spell out, at the cost of a model call per
@@ -709,8 +707,7 @@ The chart can deploy a NemoGuard content safety detector model as a KServe
 `InferenceService` next to the guardrails server. This requires GPU capacity
 and is facilitator-provisioned; skip it when no GPU nodes are available.
 
-Verify GPU capacity before attempting. The detector requests an NVIDIA MIG
-resource by default (`contentSafety.gpu.resourceType`):
+Verify GPU capacity before attempting (`contentSafety.gpu.resourceType`):
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -731,7 +728,7 @@ test "$GPU_FOUND" = "1"
 
 If the pre-check fails, use Option A instead. The detector pod cannot schedule
 without GPU capacity: the InferenceService reports `READY: False` and the pod
-stays `Pending` with `Insufficient nvidia.com/mig-2g.24gb`.
+stays `Pending` with `Insufficient nvidia.com/gpu`.
 
 Deploy the detector:
 

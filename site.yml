@@ -24,6 +24,8 @@ antora:
       script_stem: header-scripts
       mermaid_initialize_options:
         start_on_load: true
+        flowchart:
+          use_max_width: false
     - require: '@andrew-jones/antora-tabs-extension'
 
 output:
