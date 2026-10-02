@@ -42,6 +42,37 @@ virtualization workloads.
   reference deployment).
 * Identify the installation stop condition and collect failure diagnostics.
 
+== Have your API keys ready
+
+Two provider API keys are required during this module's secrets step. You
+provide them yourself — they are never committed to git and never leave your
+control node except into the cluster's secret manager:
+
+[cols="1,2,2"]
+|===
+|Key |Where to get it |Used for
+
+|NVIDIA NGC API key
+|https://build.nvidia.com — sign in, open any model, and copy your key
+(`nvapi-...`)
+|Inference: the model the agent sandboxes call (the workshop's shared-key
+pattern uses one key per cluster)
+
+|Tavily API key
+|https://tavily.com — sign in and copy your key (`tvly-...`)
+|Web search: the search provider the sandboxes use
+|===
+
+Store both as readable files on the control node before continuing — the
+secrets exercise reads them from these paths:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+cat > ~/.nvidia-api-key   # paste your NGC key (nvapi-...)
+cat > ~/.tavily-api-key   # paste your Tavily key (tvly-...)
+chmod 600 ~/.nvidia-api-key ~/.tavily-api-key
+----
+
 == Exercise 1: Prepare the control node
 
 The control node is the machine you run this installation from. Install and

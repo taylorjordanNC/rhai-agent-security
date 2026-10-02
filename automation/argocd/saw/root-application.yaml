@@ -25,7 +25,7 @@ spec:
     namespace: openshift-gitops
   source:
     repoURL: https://github.com/taylorjordanNC/rhai-agent-security
-    targetRevision: main
+    targetRevision: gitops-updates
     path: automation/argocd/saw/hub
     directory:
       include: "*.yaml"
