@@ -8,3 +8,4 @@ helmCharts:
   - name: vault
     includeCRDs: true
     releaseName: vault
+    valuesFile: values.yaml

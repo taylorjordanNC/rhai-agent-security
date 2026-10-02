@@ -1,0 +1,12 @@
+# Vault image overrides — this cluster's node-level registry config redirects
+# docker.io to registry.connect.redhat.com, which does not carry the vault
+# images. Mirror them to the internal registry (the workshop's mirror flow)
+# and reference the in-cluster DNS name.
+server:
+  image:
+    repository: image-registry.openshift-image-registry.svc:5000/openshell-agents/vault
+    tag: "1.21.2"
+injector:
+  image:
+    repository: image-registry.openshift-image-registry.svc:5000/openshell-agents/vault-k8s
+    tag: "1.7.2"
