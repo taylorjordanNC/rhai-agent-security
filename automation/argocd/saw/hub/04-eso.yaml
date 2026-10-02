@@ -20,8 +20,11 @@ spec:
     targetRevision: gitops-updates
     path: automation/argocd/saw/applications/eso/base
     kustomize:
-      # the base renders the vendored ESO chart via helmGlobals
+      # the base renders the vendored ESO chart via helmGlobals; the chart
+      # lives in vendor/ (outside the base), so the root-only load restrictor
+      # must be relaxed
       enableHelm: true
+      loadRestrictor: LoadRestrictionsNone
   syncPolicy:
     automated:
       selfHeal: true
