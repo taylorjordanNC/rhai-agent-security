@@ -1,0 +1,4 @@
+# Site values for the governance-policy chart. Defaults are used: the sandbox
+# policy and provider profiles ship with the chart (tavily + brave covered by
+# the web-search profile).
+{}

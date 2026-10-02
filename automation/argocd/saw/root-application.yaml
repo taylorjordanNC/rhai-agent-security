@@ -1,0 +1,42 @@
+# SAW GitOps root application — applies the hub children (sync-wave ordered).
+#
+# Deployed by the RHDP field-content chart? No: applied directly (bootstrap),
+# like the capstone template's manual path:
+#
+#   oc apply -f automation/argocd/saw/root-application.yaml
+#
+# The Application watches this repository's automation/argocd/saw/hub
+# directory. Sync waves order the tree:
+#   w0 namespaces -> w1 subscriptions -> w2 vault -> w3 vault-config
+#   -> w4 eso -> w5 openshift-cnv -> w6 pattern-secrets
+#   -> w7 keycloak + governance -> w8 saw-bom -> w9 saw-users
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: saw-gitops
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: secure-agent-workspace
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
+  source:
+    repoURL: https://github.com/taylorjordanNC/rhai-agent-security
+    targetRevision: main
+    path: automation/argocd/saw/hub
+    directory:
+      include: "*.yaml"
+  syncPolicy:
+    automated:
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    syncOptions:
+      - Validate=true

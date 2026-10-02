@@ -1,0 +1,35 @@
+# Governance interceptor (sync wave 7) — the gRPC interceptor the gateway
+# calls to enforce signed policies; pulls the public ghcr image.
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: saw-governance-interceptor
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshell-agents
+  sources:
+    - repoURL: https://github.com/taylorjordanNC/secure-agent-workspace
+      targetRevision: workshop
+      path: charts/governance-interceptor
+      helm:
+        valueFiles:
+          - $values/governance-interceptor.yaml
+    - repoURL: https://github.com/taylorjordanNC/rhai-agent-security
+      targetRevision: main
+      path: automation/argocd/saw/values
+      ref: values
+  syncPolicy:
+    automated:
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

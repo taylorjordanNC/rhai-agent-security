@@ -1,0 +1,38 @@
+# Saw users (sync wave 9) — one namespace and three Argo Applications
+# (secrets, BOM, sandbox VM) per user. The chart renders those child Apps
+# from global.repoURL/global.targetRevision, so they also track the fork's
+# workshop branch. Users are listed in values/saw-users.yaml.
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: saw-users
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "9"
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshell-agents
+  sources:
+    - repoURL: https://github.com/taylorjordanNC/secure-agent-workspace
+      targetRevision: workshop
+      path: charts/saw-users
+      helm:
+        valueFiles:
+          - $values/saw-users.yaml
+    - repoURL: https://github.com/taylorjordanNC/rhai-agent-security
+      targetRevision: main
+      path: automation/argocd/saw/values
+      ref: values
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    retry:
+      limit: 20
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

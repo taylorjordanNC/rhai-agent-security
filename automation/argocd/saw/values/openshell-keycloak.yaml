@@ -1,0 +1,4 @@
+# Site values for the openshell-keycloak chart. Defaults are used: the RHBK
+# operator computes the route hostname; the openshell realm and clients ship
+# with the chart.
+{}

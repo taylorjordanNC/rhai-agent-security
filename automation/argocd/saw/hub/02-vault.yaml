@@ -1,0 +1,28 @@
+# Vault (sync wave 2) — the vendored hashicorp-vault framework chart. The
+# chart source is this repo (vendor/ has no upstream-merge coupling).
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: saw-vault
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vault
+  source:
+    repoURL: https://github.com/taylorjordanNC/rhai-agent-security
+    targetRevision: main
+    path: automation/argocd/saw/applications/vault/base
+  syncPolicy:
+    automated:
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

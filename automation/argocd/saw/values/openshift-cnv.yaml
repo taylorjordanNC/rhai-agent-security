@@ -1,0 +1,5 @@
+# Site values for the openshift-cnv chart (this workshop cluster).
+# This is an emulated RHDP demo cluster (no /dev/kvm): VMs boot via QEMU
+# software emulation. Virt-supported clusters set this to false (the chart
+# default) for the faster hardware-virtualization path.
+softwareEmulation: true

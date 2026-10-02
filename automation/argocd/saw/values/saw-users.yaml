@@ -1,0 +1,17 @@
+# Site values for the saw-users chart.
+# global.repoURL/global.targetRevision point the per-user Applications at the
+# fork's workshop branch (the charts the workshop deploys). clusterDomain
+# resolves the OIDC issuer URL and route hosts. The Argo namespace is this
+# cluster's openshift-gitops instance (not the VP framework's vp-gitops).
+global:
+  repoURL: https://github.com/taylorjordanNC/secure-agent-workspace
+  targetRevision: workshop
+  clusterDomain: cluster-94vdw.dyn.redhatworkshops.io
+  pattern: secure-agent-workspace
+  vpArgoNamespace: openshift-gitops
+argo:
+  namespace: openshift-gitops
+# One entry per workshop participant: the VM name (lowercase DNS label, at
+# most 19 chars), in namespace saw-<name>.
+users:
+  - name: workshop

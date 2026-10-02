@@ -1,0 +1,37 @@
+# OpenShift Virtualization (sync wave 5) — the SAW chart from the fork's
+# workshop branch. `softwareEmulation: true` in the site values: this is an
+# emulated demo cluster (no /dev/kvm); virt-supported clusters leave it false.
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: saw-openshift-cnv
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-cnv
+  sources:
+    - repoURL: https://github.com/taylorjordanNC/secure-agent-workspace
+      targetRevision: workshop
+      path: charts/openshift-cnv
+      helm:
+        valueFiles:
+          - $values/openshift-cnv.yaml
+    - repoURL: https://github.com/taylorjordanNC/rhai-agent-security
+      targetRevision: main
+      path: automation/argocd/saw/values
+      ref: values
+  syncPolicy:
+    automated:
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

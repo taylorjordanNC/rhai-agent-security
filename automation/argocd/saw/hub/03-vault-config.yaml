@@ -1,0 +1,30 @@
+# Vault configuration (sync wave 3) — a Job that initializes + unseals the
+# vault and configures the kubernetes auth role (`hub-role` bound to the ESO
+# service account). Convergence of this wave is what unblocks the ESO
+# ExternalSecrets (wave 4) resolving.
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: saw-vault-config
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vault
+  source:
+    repoURL: https://github.com/taylorjordanNC/rhai-agent-security
+    targetRevision: main
+    path: automation/argocd/saw/applications/vault-config/base
+  syncPolicy:
+    automated:
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

@@ -1,0 +1,3 @@
+# Site values for the saw-bom chart. Defaults are used: the data-science
+# profile (tavily web search, NVIDIA inference via the shared NGC key).
+{}

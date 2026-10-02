@@ -1,0 +1,3 @@
+# Site values for the governance-interceptor chart. Defaults are used: the
+# public ghcr image pinned to the SAW gateways' OpenShell release.
+{}

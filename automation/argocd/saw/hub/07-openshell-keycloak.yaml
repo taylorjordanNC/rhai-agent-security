@@ -1,0 +1,35 @@
+# Keycloak / OIDC (sync wave 7) — the RHBK operator (wave 1) deploys
+# Keycloak; the chart's KeycloakRealmImport creates the openshell realm.
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: saw-openshell-keycloak
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: saw-keycloak
+  sources:
+    - repoURL: https://github.com/taylorjordanNC/secure-agent-workspace
+      targetRevision: workshop
+      path: charts/openshell-keycloak
+      helm:
+        valueFiles:
+          - $values/openshell-keycloak.yaml
+    - repoURL: https://github.com/taylorjordanNC/rhai-agent-security
+      targetRevision: main
+      path: automation/argocd/saw/values
+      ref: values
+  syncPolicy:
+    automated:
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

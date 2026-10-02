@@ -1,0 +1,30 @@
+# External Secrets Operator (sync wave 4) — the vendored
+# openshift-external-secrets framework chart. The ESO ExternalSecrets
+# (pattern-secrets, wave 6) resolve only after this is healthy AND the vault
+# is seeded with the provider keys.
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: saw-eso
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-secrets
+  source:
+    repoURL: https://github.com/taylorjordanNC/rhai-agent-security
+    targetRevision: main
+    path: automation/argocd/saw/applications/eso/base
+  syncPolicy:
+    automated:
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

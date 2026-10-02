@@ -1,0 +1,50 @@
+# SAW GitOps operator subscriptions (sync wave 1) — mirrors the fork's
+# values-prod.yaml clusterGroup subscriptions. RHOAI (rhods-operator) is
+# deliberately omitted: automation/argocd/capstone/50-rhods-operator.yaml
+# already declares and manages it. RHDH is omitted: the self-service portal
+# is not part of the merged SAW architecture yet.
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: openshift-external-secrets-operator
+  namespace: external-secrets-operator
+  labels:
+    app.kubernetes.io/part-of: secure-agent-workspace
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  channel: stable-v1
+  installPlanApproval: Automatic
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  name: openshift-external-secrets-operator
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: kubevirt-hyperconverged
+  namespace: openshift-cnv
+  labels:
+    app.kubernetes.io/part-of: secure-agent-workspace
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  channel: stable
+  installPlanApproval: Automatic
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  name: kubevirt-hyperconverged
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: rhbk-operator
+  namespace: saw-keycloak
+  labels:
+    app.kubernetes.io/part-of: secure-agent-workspace
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  channel: stable-v26
+  installPlanApproval: Automatic
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  name: rhbk-operator
