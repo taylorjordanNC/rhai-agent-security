@@ -46,9 +46,12 @@ metadata:
   labels:
     app.kubernetes.io/part-of: secure-agent-workspace
     argocd.argoproj.io/managed-by: openshift-gitops
-    pod-security.kubernetes.io/audit: privileged
+    # enforce privileged (CNV needs it); audit/warn are left to OpenShift's
+    # SCC pod-security label sync — declaring them privileged here loops
+    # against the sync, which rewrites them to restricted and stalls the
+    # app-of-apps sync on this namespace's health.
+    security.openshift.io/scc.podSecurityLabelSync: "true"
     pod-security.kubernetes.io/enforce: privileged
-    pod-security.kubernetes.io/warn: privileged
     argocd.argoproj.io/sync-wave: "0"
 ---
 apiVersion: operators.coreos.com/v1
