@@ -16,10 +16,10 @@ spec:
           imagePullPolicy: IfNotPresent
           command: ["/bin/sh", "/scripts/configure.sh"]
           env:
+            # The vault server runs with tlsDisable (in-cluster HTTP); the
+            # route/external TLS can be added later if needed.
             - name: VAULT_ADDR
-              value: https://vault.vault.svc.cluster.local:8200
-            - name: VAULT_CACERT
-              value: /var/run/vault-ca/service-ca.crt
+              value: http://vault.vault.svc.cluster.local:8200
           volumeMounts:
             - name: scripts
               mountPath: /scripts

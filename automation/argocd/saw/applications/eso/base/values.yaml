@@ -1,2 +1,26 @@
-# ESO chart values — the vendored openshift-external-secrets chart defaults.
-{}
+# ESO chart values — the ClusterSecretStore wiring for this cluster.
+# The vault server runs with tlsDisable (in-cluster HTTP): http address, no
+# CA provider. The store authenticates via the vault kubernetes auth at
+# mount 'hub' with role 'hub-role' (configured by the vault-config Job),
+# bound to the ocp-external-secrets service account; its token Secret is
+# created by the ESO chart.
+ocpExternalSecrets:
+  vault:
+    externalAddress: http://vault.vault.svc.cluster.local:8200
+    external:
+      secretRef:
+        name: ocp-external-secrets
+        namespace: external-secrets
+        key: token
+    kubernetesMountPath: hub
+    kubernetesRole: hub-role
+    mountPath: hub
+  rbac:
+    rolename: hub-role
+    serviceAccount:
+      name: ocp-external-secrets
+      namespace: external-secrets
+  caProvider:
+    enabled: false
+clusterGroup:
+  isHubCluster: true
