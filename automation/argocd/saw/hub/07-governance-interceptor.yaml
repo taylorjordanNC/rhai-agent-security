@@ -19,7 +19,7 @@ spec:
       path: charts/governance-interceptor
       helm:
         valueFiles:
-          - $values/governance-interceptor.yaml
+          - $values/automation/argocd/saw/values/governance-interceptor.yaml
     - repoURL: https://github.com/taylorjordanNC/rhai-agent-security
       targetRevision: gitops-updates
       path: automation/argocd/saw/values

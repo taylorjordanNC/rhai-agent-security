@@ -19,7 +19,7 @@ spec:
       path: charts/openshell-keycloak
       helm:
         valueFiles:
-          - $values/openshell-keycloak.yaml
+          - $values/automation/argocd/saw/values/openshell-keycloak.yaml
     - repoURL: https://github.com/taylorjordanNC/rhai-agent-security
       targetRevision: gitops-updates
       path: automation/argocd/saw/values
