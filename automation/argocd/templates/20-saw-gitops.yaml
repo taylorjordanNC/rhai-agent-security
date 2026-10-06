@@ -1,16 +1,19 @@
-# SAW GitOps root application — applies the hub children (sync-wave ordered).
+# SAW GitOps root application — the app-of-apps that applies the hub children
+# (sync-wave ordered):
 #
-# Rendered by the RHDP field-content chart (templates/20-saw-gitops.yaml):
-# the order's gitops path deploys the SAW tree automatically, like the
-# capstone child. This manifest is the manual path without the order:
+#   w0 namespaces -> w1 subscriptions -> w2 vault -> w3 vault-config
+#   -> w4 eso -> w5 openshift-cnv -> w6 pattern-secrets
+#   -> w7 keycloak + governance -> w8 saw-bom -> w9 saw-users
+#
+# Rendered by the RHDP field-content chart (this chart): the order's gitops
+# path deploys the SAW tree automatically, like the capstone child. Without
+# the order pointer, apply the manifest form instead:
 #
 #   oc apply -f automation/argocd/saw/root-application.yaml
 #
 # The Application watches this repository's automation/argocd/saw/hub
-# directory. Sync waves order the tree:
-#   w0 namespaces -> w1 subscriptions -> w2 vault -> w3 vault-config
-#   -> w4 eso -> w5 openshift-cnv -> w6 pattern-secrets
-#   -> w7 keycloak + governance -> w8 saw-bom -> w9 saw-users
+# directory on the gitops-updates branch (the branch the SAW charts and site
+# values are validated on).
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application

@@ -1,5 +1,8 @@
-# Site values for the openshift-cnv chart (this workshop cluster).
-# This is an emulated RHDP demo cluster (no /dev/kvm): VMs boot via QEMU
-# software emulation. Virt-supported clusters set this to false (the chart
-# default) for the faster hardware-virtualization path.
-softwareEmulation: true
+# Site values for the openshift-cnv chart. The chart matches upstream and
+# declares an empty HyperConverged spec: the operator populates its defaults.
+# CNV 4.22 removed the HyperConverged useEmulation knob, so VMs on this
+# cluster run on hardware virtualization (this control plane has nested
+# virt). Emulated clusters (no /dev/kvm) are not supported by 4.22's
+# declarative path — verify the emulation story separately before a fleet
+# run on emulated hosts.
+{}

@@ -11,6 +11,15 @@ global:
   vpArgoNamespace: openshift-gitops
 argo:
   namespace: openshift-gitops
+# Per-user openshell-saw value overrides (merged over the chart's defaults).
+defaults:
+  openshellSaw:
+    job:
+      # The prepare Job's bounded waits (deps + the golden-image and clone
+      # DataVolume imports, 900s each) sum to ~35m — above the chart's 30m
+      # default, so a slow import kills the Job before its waits would.
+      # 60m clears the worst case with headroom.
+      activeDeadlineSeconds: 3600
 # One entry per workshop participant: the VM name (lowercase DNS label, at
 # most 19 chars), in namespace saw-<name>.
 users:

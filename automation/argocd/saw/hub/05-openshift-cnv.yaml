@@ -1,6 +1,7 @@
 # OpenShift Virtualization (sync wave 5) — the SAW chart from the fork's
-# workshop branch. `softwareEmulation: true` in the site values: this is an
-# emulated demo cluster (no /dev/kvm); virt-supported clusters leave it false.
+# workshop branch. The chart declares an empty HyperConverged spec (upstream
+# shape; CNV 4.22 removed the useEmulation knob): the operator populates its
+# defaults, so IgnoreExtraneous keeps the app Synced against them.
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -9,6 +10,7 @@ metadata:
   namespace: openshift-gitops
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
     argocd.argoproj.io/sync-wave: "5"
 spec:
   project: default
