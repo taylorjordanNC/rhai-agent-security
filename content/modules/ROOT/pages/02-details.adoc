@@ -16,8 +16,8 @@ or by you as the Module 3 prework before class.
 | Every participant
 (Prerequisites, Modules 1, 2, 8)
 | `oc` authenticated to the target cluster; Helm 3.x; Git, `curl`, OpenSSL,
-`tar`, `install`, and standard Unix shell tools; the OpenShell CLI pinned to
-`{openshell_version}` (installed below); both workshop checkouts
+`tar`, `install`, `podman`, and standard Unix shell tools; the OpenShell CLI
+pinned to `{openshell_version}` (installed below); both workshop checkouts
 (see xref:#_get_the_workshop_checkouts[Get the workshop checkouts]).
 
 | Module 4 — operate SAW
@@ -68,12 +68,10 @@ Provided by the facilitators:
 
 Rules:
 
-* Match the client to its gateway: the workshop ships **two OpenShell
-  clients**. The raw OpenShell track (Modules 1 and 2) uses the tarball
-  client pinned to `{openshell_version}`, installed below. The SAW track
-  (Module 3 onward) uses the RHAIV-packaged OpenShell CLI **container**,
-  `{openshell_saw_version}` — not a newer tarball or Homebrew build. Do not
-  mix client and gateway versions.
+* Use one OpenShell CLI for the whole workshop: the RHAIV-packaged OpenShell
+  CLI **container**, pinned to `{openshell_version}`, installed below through a
+  PATH wrapper script. Do not use a raw tarball, a newer release, or a
+  Homebrew build, and do not mix client and gateway versions.
 * The raw policy track requires no model API key; the SAW track's key is
   facilitator-provisioned through the secret contract.
 * The standalone NemoClaw CLI (`nemoclaw onboard`, local container-runtime
@@ -96,19 +94,29 @@ link:https://mirror.openshift.com/pub/openshift-v4/clients/ocp/[matching client
 release^], and Helm from the link:https://helm.sh/docs/intro/install/[official
 instructions^].
 
-Install the exact OpenShell client from the workshop repository root. The
-installer selects the Linux x86_64, Linux ARM64, or Apple Silicon artifact:
+Install the exact OpenShell CLI from the workshop repository root. The
+installer writes a PATH wrapper script that runs the RHAIV container through
+Podman — it works in both interactive shells and `make` recipe shells:
 
-[source,bash,subs="attributes+"]
+[source,bash,role="execute",subs="attributes+"]
 ----
-OPENSHELL_VERSION={openshell_version} \
-OPENSHELL_INSTALL_DIR="$HOME/openshell-cli" \
-  ./automation/bootstrap/install-openshell-cli.sh
-export PATH="$HOME/openshell-cli:$PATH"
+./automation/bootstrap/install-openshell-cli.sh
 ----
 
-Persist that `PATH` setting in the control node's `.bashrc` or `.zshrc`. Do
-not use an unpinned latest installer for this workshop.
+Persist the resulting `PATH` setting (`~/.local/bin`) in the control node's
+`.bashrc` or `.zshrc`. Do not use an unpinned installer for this workshop.
+
+The image ENTRYPOINT is the CLI and its `HOME` is `/`, so the config mount
+target is `/.config/openshell` (not `/root/.config`); use
+`--platform linux/amd64` on Apple Silicon hosts. Verify the install:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+podman run --rm --platform linux/amd64 \
+  -v "$HOME/.config/openshell:/.config/openshell" \
+  {openshell_cli_image} --version   # expect {openshell_version}
+openshell --version                # expect {openshell_version}
+----
 
 For SAW VM inspection and troubleshooting, install `virtctl` from the
 OpenShift console client download that matches the cluster, and keep the
@@ -125,11 +133,11 @@ for tool in oc helm git curl openssl make; do
 done
 oc version --client
 helm version
-test "$("$HOME/openshell-cli/openshell" --version | awk '{print $NF}')" = "{openshell_version}"
+test "$(openshell --version | awk '{print $NF}')" = "{openshell_version}"
 ----
 
 Expected result: every tool prints its install path. The final `test` line is
-the version pin — it fails if the installed OpenShell client is anything but
+the version pin — it fails if the installed OpenShell CLI is anything but
 `{openshell_version}`.
 
 SAW operation additionally requires these tools on the control node:
@@ -145,45 +153,15 @@ python3 -c 'import yaml'
 
 Expected result: the same — every path printed, `virtctl` reporting a client
 version, and the PyYAML import exiting silently when present. The SAW guest
-gateway reports the `{openshell_saw_version}` build — the expected Red Hat SAW
-packaging suffix on the same compatibility line.
+gateway also reports the `{openshell_version}` build — the same RHAIV build as
+your control-node CLI.
 
-For the SAW track, run the OpenShell CLI as a container instead of the raw
-tarball client. The image ENTRYPOINT is the CLI and its `HOME` is `/`, so the
-config mount target is `/.config/openshell` (not `/root/.config`); use
-`--platform linux/amd64` on Apple Silicon hosts:
-
-[source,bash,role="execute",subs="attributes+"]
-----
-podman run --rm --platform linux/amd64 \
-  -v "$HOME/.config/openshell:/.config/openshell" \
-  {openshell_cli_image} --version   # expect {openshell_saw_version}
-----
-
-To make `openshell` resolve to the container CLI while working the SAW
-modules — including the modules' `make` targets, whose recipe shells are
-non-interactive `/bin/sh` and do not expand aliases — write a PATH wrapper
-instead of a shell alias:
-
-[source,bash,role="execute",subs="attributes+"]
-----
-mkdir -p "$HOME/.local/bin"
-cat > "$HOME/.local/bin/openshell" <<'EOF'
-#!/bin/bash
-exec podman run --rm --platform linux/amd64 \
-  -v "$HOME/.config/openshell:/.config/openshell" \
-  {openshell_cli_image} \
-  "$@"
-EOF
-chmod 0755 "$HOME/.local/bin/openshell"
-----
-
-Ensure `~/.local/bin` is on `PATH` (add `export PATH="$HOME/.local/bin:$PATH"`
-to your shell profile if it is not). A wrapper works in both interactive
-shells and `make` recipe shells. Keep the two clients distinct: the
-`{openshell_version}` tarball for the raw track (its own
-`$HOME/openshell-cli` prefix on `PATH`), this container wrapper for the SAW
-track.
+The `openshell` command resolves to the container CLI through the
+`~/.local/bin/openshell` PATH wrapper written by the installer (shown above).
+A wrapper works in both interactive shells and `make` recipe shells, whose
+non-interactive `/bin/sh` do not expand aliases. Ensure `~/.local/bin` is on
+`PATH` (add `export PATH="$HOME/.local/bin:$PATH"` to your shell profile if it
+is not).
 
 == Get the workshop checkouts
 

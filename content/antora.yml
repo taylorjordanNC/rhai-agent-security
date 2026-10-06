@@ -18,7 +18,7 @@ asciidoc:
     saw_repo_url: 'https://github.com/taylorjordanNC/secure-agent-workspace.git'
     saw_repo_branch: 'workshop'
     saw_repo_dir: 'secure-agent-workspace'
-    openshell_version: '0.0.103'
+    openshell_version: '0.1.2-rhaiv.0'
     openshell_sandbox_image: 'ghcr.io/nvidia/openshell-community/sandboxes/base@sha256:aeef1c63f00e2913ea002ccb3aaf925f338b5c5d70e63576f0d95c16a138044e'
     openshell_saw_version: '0.1.2-rhaiv.0'
     openshell_cli_image: 'quay.io/opendatahub/odh-openshell-cli@sha256:7d04766147c6960da7d06580f3efd6538679d147aa3b0cd364993c534c3a6c7b'

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 required=(oc helm openshell jq make curl openssl)
-expected_openshell_version="${OPENSHELL_VERSION:-0.0.103}"
+expected_openshell_version="${OPENSHELL_VERSION:-0.1.2-rhaiv.0}"
 missing=()
 
 for command_name in "${required[@]}"; do

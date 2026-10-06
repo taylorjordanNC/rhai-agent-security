@@ -7,7 +7,9 @@ FLEET_DIR := $(AUTOMATION_DIR)/fleet
 CAPSTONE_APP ?= module-7-prereqs
 GITOPS_NS ?= openshift-gitops
 
-OPENSHELL_VERSION ?= 0.0.103
+# Helm chart version (not the CLI version). The gateway image is digest-pinned
+# in openshell-env/install.sh to match the workshop's 0.1.2-rhaiv.0 CLI.
+OPENSHELL_VERSION ?= 0.1.2
 OPENSHELL_SANDBOX_IMAGE ?= ghcr.io/nvidia/openshell-community/sandboxes/base@sha256:aeef1c63f00e2913ea002ccb3aaf925f338b5c5d70e63576f0d95c16a138044e
 RAW_GATEWAY_NAME ?= local-gateway
 
@@ -39,7 +41,7 @@ openshell-install:
 	OPENSHELL_VERSION=$(OPENSHELL_VERSION) OPENSHELL_SANDBOX_IMAGE=$(OPENSHELL_SANDBOX_IMAGE) bash $(HARNESS_DIR)/install.sh
 
 openshell-verify:
-	OPENSHELL_VERSION=$(OPENSHELL_VERSION) RAW_GATEWAY_NAME=$(RAW_GATEWAY_NAME) \
+	OPENSHELL_CLI_VERSION=0.1.2-rhaiv.0 RAW_GATEWAY_NAME=$(RAW_GATEWAY_NAME) \
 	  bash $(HARNESS_DIR)/verify.sh
 
 openshell-security-test:

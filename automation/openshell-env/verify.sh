@@ -6,9 +6,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/functions.sh"
 
 NAMESPACE="${NAMESPACE:-openshell}"
-OPENSHELL_VERSION="${OPENSHELL_VERSION:-0.0.103}"
+OPENSHELL_CLI_VERSION="${OPENSHELL_CLI_VERSION:-0.1.2-rhaiv.0}"
 RAW_GATEWAY_NAME="${RAW_GATEWAY_NAME:-local-gateway}"
-export OPENSHELL_VERSION RAW_GATEWAY_NAME
+export OPENSHELL_CLI_VERSION RAW_GATEWAY_NAME
 PASSED=0
 FAILED=0
 
@@ -35,7 +35,7 @@ check "Gateway pod running" oc -n "$NAMESPACE" wait --for=condition=Ready pod -l
 check "Gateway service exists" oc -n "$NAMESPACE" get svc openshell
 
 if command -v openshell &>/dev/null; then
-    check "openshell ${OPENSHELL_VERSION} CLI" bash -c 'test "$(openshell --version | awk '\''{print $NF}'\'')" = "$OPENSHELL_VERSION"'
+    check "openshell ${OPENSHELL_CLI_VERSION} CLI" bash -c 'test "$(openshell --version | awk '\''{print $NF}'\'')" = "$OPENSHELL_CLI_VERSION"'
     check "raw workshop gateway connectivity" openshell --gateway "$RAW_GATEWAY_NAME" status
 fi
 

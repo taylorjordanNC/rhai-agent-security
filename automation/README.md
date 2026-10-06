@@ -72,7 +72,8 @@ See `fleet/README.md` for the one-time shared assets (fork checkout,
 Run from a RHEL/Fedora bastion or a validated Linux/WSL2 environment:
 
 * OpenShift 4.22 access with the permissions required by the selected install.
-* `oc`, Helm 3, OpenShell `0.0.103`, `jq`, `make`, `curl`, and `openssl`.
+* `oc`, Helm 3, OpenShell `0.1.2-rhaiv.0` (RHAIV container via the PATH
+  wrapper), Podman 4.3+, `jq`, `make`, `curl`, and `openssl`.
 * `virtctl` matching the cluster for SAW VM inspection and SSH.
 
 Install the pinned OpenShell client with:
@@ -133,8 +134,8 @@ content, and verification cannot drift:
 | Location | What to update
 
 | `automation/Makefile`
-| `OPENSHELL_VERSION` (Helm chart and CLI pin) and `OPENSHELL_SANDBOX_IMAGE`
-  (default sandbox image digest)
+| `OPENSHELL_VERSION` (Helm chart pin; the gateway image digest is pinned in
+  `install.sh`) and `OPENSHELL_SANDBOX_IMAGE` (default sandbox image digest)
 
 | `content/antora.yml`
 | `openshell_version` and `openshell_sandbox_image` (rendered into the
@@ -145,8 +146,8 @@ content, and verification cannot drift:
   with this repository; `npm run validate:docs` enforces the parity
 
 | `automation/openshell-env/verify.sh`
-| The `OPENSHELL_VERSION` fallback default used when the script runs outside
-  `make openshell-verify`
+| The `OPENSHELL_CLI_VERSION` fallback default used when the script runs
+  outside `make openshell-verify`
 
 | `automation/README.md` and
   `automation/openshell-env/README.md`

@@ -9,8 +9,13 @@ source "$SCRIPT_DIR/functions.sh"
 
 NAMESPACE="${NAMESPACE:-openshell}"
 RAW_GATEWAY_NAME="${RAW_GATEWAY_NAME:-local-gateway}"
-OPENSHELL_VERSION="${OPENSHELL_VERSION:-0.0.103}"
+# OpenShell Helm chart version. The chart pins the gateway image by digest
+# below, so the gateway build matches the workshop's 0.1.2-rhaiv.0 CLI.
+OPENSHELL_VERSION="${OPENSHELL_VERSION:-0.1.2}"
 OPENSHELL_SANDBOX_IMAGE="${OPENSHELL_SANDBOX_IMAGE:-ghcr.io/nvidia/openshell-community/sandboxes/base@sha256:aeef1c63f00e2913ea002ccb3aaf925f338b5c5d70e63576f0d95c16a138044e}"
+# RHAIV gateway image (0.1.2-rhaiv.0), digest-pinned like the SAW track.
+OPENSHELL_GATEWAY_REPO="${OPENSHELL_GATEWAY_REPO:-quay.io/opendatahub/odh-openshell-gateway}"
+OPENSHELL_GATEWAY_DIGEST="${OPENSHELL_GATEWAY_DIGEST:-sha256:c3b230a32245d0a6c35ed11c17cf590da9ede79dfb0378e3829e16709f63fba3}"
 
 if [ "${ENABLE_TLS:-false}" = "true" ]; then
     echo "ENABLE_TLS is not supported by this workshop environment. Use the documented local port-forward." >&2
@@ -51,10 +56,14 @@ step "Step 5/7: Install OpenShell Helm chart"
 helm upgrade --install openshell oci://ghcr.io/nvidia/openshell/helm-chart \
     --namespace "$NAMESPACE" \
     $VERSION_FLAG \
+    --set gateway.image.registry="${OPENSHELL_GATEWAY_REPO%%/*}" \
+    --set gateway.image.repository="${OPENSHELL_GATEWAY_REPO#*/}" \
+    --set gateway.image.digest="$OPENSHELL_GATEWAY_DIGEST" \
+    --set sandbox.image.repository="${OPENSHELL_SANDBOX_IMAGE%@*}" \
+    --set sandbox.image.digest="${OPENSHELL_SANDBOX_IMAGE#*@}" \
     --set pkiInitJob.enabled=false \
     --set server.disableTls=true \
     --set server.auth.allowUnauthenticatedUsers=true \
-    --set-string server.sandboxImage="$OPENSHELL_SANDBOX_IMAGE" \
     --set podSecurityContext.fsGroup=null \
     --set securityContext.runAsUser=null
 
@@ -79,7 +88,7 @@ echo "   1. Start a local port-forward in a separate terminal:"
 echo "      oc -n $NAMESPACE port-forward svc/openshell 8080:8080"
 echo ""
 echo "   2. Register the local gateway endpoint:"
-echo "      openshell gateway add http://127.0.0.1:8080 --local --name $RAW_GATEWAY_NAME"
+echo "      openshell gateway add http://host.containers.internal:8080 --local --name $RAW_GATEWAY_NAME"
 echo ""
 echo "   3. Select the gateway and check status:"
 echo "      openshell gateway select $RAW_GATEWAY_NAME"

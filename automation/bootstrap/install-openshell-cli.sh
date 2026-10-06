@@ -1,55 +1,39 @@
 #!/usr/bin/env bash
+# Install the workshop OpenShell CLI: a PATH wrapper script that runs the
+# RHAIV-packaged OpenShell CLI container through Podman. The wrapper works in
+# both interactive shells and make recipe shells (aliases do not).
 set -euo pipefail
 
-VERSION="${OPENSHELL_VERSION:-0.0.103}"
-INSTALL_DIR="${OPENSHELL_INSTALL_DIR:-$HOME/.local/bin}"
-TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
+# Digest-pinned RHAIV CLI image (0.1.2-rhaiv.0, amd64 single-platform digest).
+OPENSHELL_CLI_IMAGE="${OPENSHELL_CLI_IMAGE:-quay.io/opendatahub/odh-openshell-cli@sha256:7d04766147c6960da7d06580f3efd6538679d147aa3b0cd364993c534c3a6c7b}"
+EXPECTED_VERSION="${OPENSHELL_CLI_VERSION:-0.1.2-rhaiv.0}"
+BIN_DIR="${OPENSHELL_INSTALL_DIR:-$HOME/.local/bin}"
+CONFIG_DIR="$HOME/.config/openshell"
 
-case "$(uname -s):$(uname -m)" in
-  Darwin:arm64)
-    ASSET="openshell-aarch64-apple-darwin.tar.gz"
-    ;;
-  Linux:x86_64)
-    ASSET="openshell-x86_64-unknown-linux-musl.tar.gz"
-    ;;
-  Linux:aarch64|Linux:arm64)
-    ASSET="openshell-aarch64-unknown-linux-musl.tar.gz"
-    ;;
-  *)
-    printf 'Unsupported host. Use a RHEL/Fedora bastion or validated WSL2 Linux environment.\n' >&2
-    exit 1
-    ;;
-esac
-
-ARCHIVE="$TMP_DIR/openshell.tar.gz"
-URL="https://github.com/NVIDIA/OpenShell/releases/download/v${VERSION}/${ASSET}"
-CHECKSUMS="$TMP_DIR/openshell-checksums-sha256.txt"
-CHECKSUMS_URL="https://github.com/NVIDIA/OpenShell/releases/download/v${VERSION}/openshell-checksums-sha256.txt"
-
-mkdir -p "$INSTALL_DIR"
-curl -fsSL "$URL" -o "$ARCHIVE"
-curl -fsSL "$CHECKSUMS_URL" -o "$CHECKSUMS"
-EXPECTED_SHA256=$(awk -v asset="$ASSET" '$2 == asset { print $1 }' "$CHECKSUMS")
-if [[ -z "$EXPECTED_SHA256" ]]; then
-  printf 'No SHA-256 entry found for %s\n' "$ASSET" >&2
+if ! command -v podman >/dev/null 2>&1; then
+  printf 'podman is required to run the OpenShell CLI container.\n' >&2
   exit 1
 fi
-if command -v sha256sum >/dev/null 2>&1; then
-  ACTUAL_SHA256=$(sha256sum "$ARCHIVE" | awk '{ print $1 }')
-else
-  ACTUAL_SHA256=$(shasum -a 256 "$ARCHIVE" | awk '{ print $1 }')
-fi
-if [[ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]]; then
-  printf 'SHA-256 verification failed for %s\n' "$ASSET" >&2
-  exit 1
-fi
-tar xzf "$ARCHIVE" -C "$TMP_DIR"
-install -m 0755 "$TMP_DIR/openshell" "$INSTALL_DIR/openshell"
+
+mkdir -p "$BIN_DIR" "$CONFIG_DIR"
+cat > "$BIN_DIR/openshell" <<EOF
+#!/bin/bash
+exec podman run --rm --platform linux/amd64 \\
+  -v "$CONFIG_DIR:/.config/openshell" \\
+  "$OPENSHELL_CLI_IMAGE" \\
+  "\$@"
+EOF
+chmod 0755 "$BIN_DIR/openshell"
 
 if [[ "$(uname -s)" == "Darwin" ]]; then
-  xattr -d com.apple.quarantine "$INSTALL_DIR/openshell" 2>/dev/null || true
+  xattr -d com.apple.quarantine "$BIN_DIR/openshell" 2>/dev/null || true
 fi
 
-printf 'Installed OpenShell %s at %s\n' "$VERSION" "$INSTALL_DIR/openshell"
-printf 'Add this directory to PATH if needed: %s\n' "$INSTALL_DIR"
+# Warm the image and verify the version pin.
+if ! "$BIN_DIR/openshell" --version | grep -q "$EXPECTED_VERSION"; then
+  printf 'Version verification failed: expected %s\n' "$EXPECTED_VERSION" >&2
+  exit 1
+fi
+
+printf 'Installed OpenShell %s CLI wrapper at %s\n' "$EXPECTED_VERSION" "$BIN_DIR/openshell"
+printf 'Add this directory to PATH if needed: %s\n' "$BIN_DIR"
