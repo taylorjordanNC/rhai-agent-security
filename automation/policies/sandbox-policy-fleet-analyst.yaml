@@ -6,7 +6,7 @@
 # posture is designed into the policy, not trusted away. Module 7 applies
 # this at sandbox create:
 #   openshell --gateway <gateway> sandbox create --name analyst \
-#     --from quay.io/rh-ai-quickstart/nemoclaw-sandbox:latest \
+#     --from quay.io/rh-ai-quickstart/openclaw-openshell:latest \
 #     --policy automation/policies/sandbox-policy-fleet-analyst.yaml \
 #     --no-tty --detach -- sh -c 'sleep 86400'
 version: 1

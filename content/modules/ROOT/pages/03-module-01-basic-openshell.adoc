@@ -58,8 +58,7 @@ Run this module from the `rhai-agent-security` repository root:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-make -C {automation_repo} install-openshell \
-  OPENSHELL_VERSION={openshell_version}
+make -C {automation_repo} install-openshell
 ----
 
 The raw OpenShell installation sequence is:
@@ -92,6 +91,9 @@ later.
 Start a local gateway port-forward after the script completes. A port-forward
 is a tunnel from your workstation to a service inside the cluster; the gateway
 is internal to the cluster, so the CLI reaches it through this tunnel only.
+The CLI itself runs in a Podman container (the wrapper), so the gateway URL
+must use `host.containers.internal` — `127.0.0.1` inside the container is not
+the host and the connection is refused.
 Keep the background process running through Module 2:
 
 [source,bash,role="execute",subs="attributes+"]
@@ -109,13 +111,14 @@ verifies the connection:
 [source,bash,role="execute",subs="attributes+"]
 ----
 openshell gateway remove {raw_gateway_name} 2>/dev/null || true
-openshell gateway add "http://127.0.0.1:8080" --local --name {raw_gateway_name}
+openshell gateway add "http://host.containers.internal:8080" --local --name {raw_gateway_name}
 openshell gateway select {raw_gateway_name}
 openshell status
 ----
 
 Expected result: `openshell status` lists `{raw_gateway_name}` as the selected
-gateway and reports a healthy connection through `127.0.0.1:8080`.
+gateway and reports a healthy connection through
+`host.containers.internal:8080`.
 
 [IMPORTANT]
 ====

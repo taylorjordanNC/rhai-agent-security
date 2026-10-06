@@ -162,7 +162,7 @@ From your workstation, with the gateway selected and logged in (module 4):
 ----
 for agent in metrics traces analyst; do
   openshell --gateway {saw_gateway_name} sandbox create --name "$agent" \
-    --from quay.io/rh-ai-quickstart/nemoclaw-sandbox:latest \
+    --from quay.io/rh-ai-quickstart/openclaw-openshell:latest \
     --policy "{automation_repo}/policies/sandbox-policy-fleet-$agent.yaml" \
     --no-tty --detach -- sh -c 'sleep 86400'
 done
@@ -172,7 +172,9 @@ openshell --gateway {saw_gateway_name} sandbox list
 Pass condition: three sandboxes (`metrics`, `traces`, `analyst`) report
 Ready. The fleet agents are CLI-driven and attach no inference provider —
 the analyst's zero egress depends on it. Pin the image the same way the BOM
-does: the `nemoclaw-sandbox` base the workshop mirrors.
+does: the `openclaw-openshell` base the workshop mirrors (the
+`nemoclaw-sandbox` image lacks a usable PATH for the OpenClaw shebang, so
+CLI-created sandboxes must use `openclaw-openshell`).
 
 The fleet sandboxes live in the gateway's default workspace, so the exec
 commands below omit `--workspace`. If you create them in `{saw_workspace}`,

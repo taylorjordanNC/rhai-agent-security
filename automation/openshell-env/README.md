@@ -27,14 +27,15 @@ By the end of this exercise you will have an OpenShell gateway running on OpenSh
                             (default lab path)
 ```
 
-The gateway runs as a StatefulSet with a 1Gi PVC for its SQLite database. It creates and manages sandbox pods through the Agent Sandbox CRD. The CLI communicates with the gateway over gRPC. The default lab uses a local port-forward because an HTTP OpenShift Route strips required gRPC trailers.
+The gateway runs as a StatefulSet with a 1Gi PVC for its SQLite database. It creates and manages sandbox pods through the Agent Sandbox CRD. The CLI communicates with the gateway over gRPC. The default lab uses a local port-forward because an HTTP OpenShift Route strips required gRPC trailers. Because the CLI itself runs in a Podman container (the wrapper), the gateway URL must use `host.containers.internal` — `127.0.0.1` inside the container is not the host and the connection is refused.
 
 ## Prerequisites
 
 - Multinode OpenShift 4.22 cluster with cluster-admin access
 - `oc` CLI configured and logged in
 - Helm 3.x installed
-- `openshell` CLI v0.0.103 installed on your workstation
+- `openshell` CLI v0.1.2-rhaiv.0 installed on your workstation
+- Podman 4.3 or later (runs the OpenShell CLI container)
 
 > **CRD source:** This environment installs the [Red Hat build of Agent Sandbox](https://docs.redhat.com/en/documentation/openshift_sandboxed_containers/1.12/html/deploying_red_hat_build_of_agent_sandbox/) operator via OLM (channel `preview-0.9`). A pre-existing CRD without the expected operator subscription is treated as a stale or incompatible installation.
 
@@ -42,9 +43,13 @@ The gateway runs as a StatefulSet with a 1Gi PVC for its SQLite database. It cre
 
 ```bash
 # From the rhai-agent-security repository root
-OPENSHELL_VERSION=0.0.103 ./automation/bootstrap/install-openshell-cli.sh
-test "$(openshell --version | awk '{print $NF}')" = "0.0.103"
+./automation/bootstrap/install-openshell-cli.sh
+openshell --version   # -> 0.1.2-rhaiv.0
 ```
+
+The installer writes a PATH wrapper script at `~/.local/bin/openshell` that
+runs the RHAIV-packaged OpenShell CLI container through Podman, so the same
+CLI works in interactive shells and make recipe shells.
 
 ## Quick Start (Automated)
 
@@ -61,7 +66,7 @@ port-forward and register the gateway, then continue with sandbox creation.
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `NAMESPACE` | `openshell` | OpenShift namespace for all resources |
-| `OPENSHELL_VERSION` | `0.0.103` | Helm chart version |
+| `OPENSHELL_VERSION` | `0.1.2` | Helm chart version (the gateway image is digest-pinned to 0.1.2-rhaiv.0 in `install.sh`) |
 | `OPENSHELL_SANDBOX_IMAGE` | Pinned `base` digest | Default sandbox image |
 
 ## Step-by-Step Guide
@@ -159,11 +164,15 @@ Install the OpenShell Helm chart with OpenShift-specific overrides:
 ```bash
 helm install openshell oci://ghcr.io/nvidia/openshell/helm-chart \
     --namespace openshell \
-    --version 0.0.103 \
+    --version 0.1.2 \
+    --set gateway.image.registry=quay.io \
+    --set gateway.image.repository=opendatahub/odh-openshell-gateway \
+    --set gateway.image.digest=sha256:c3b230a32245d0a6c35ed11c17cf590da9ede79dfb0378e3829e16709f63fba3 \
+    --set sandbox.image.repository=ghcr.io/nvidia/openshell-community/sandboxes/base \
+    --set sandbox.image.digest=sha256:aeef1c63f00e2913ea002ccb3aaf925f338b5c5d70e63576f0d95c16a138044e \
     --set pkiInitJob.enabled=false \
     --set server.disableTls=true \
     --set server.auth.allowUnauthenticatedUsers=true \
-    --set-string server.sandboxImage='ghcr.io/nvidia/openshell-community/sandboxes/base@sha256:aeef1c63f00e2913ea002ccb3aaf925f338b5c5d70e63576f0d95c16a138044e' \
     --set podSecurityContext.fsGroup=null \
     --set securityContext.runAsUser=null
 ```
@@ -172,13 +181,16 @@ helm install openshell oci://ghcr.io/nvidia/openshell/helm-chart \
 
 | Override | Reason |
 |----------|--------|
+| `gateway.image.{registry,repository,digest}` | Pin the RHAIV gateway image (0.1.2-rhaiv.0) by digest, matching the workshop CLI |
+| `sandbox.image.{repository,digest}` | Pin the default sandbox base image by digest |
 | `pkiInitJob.enabled=false` | We pre-created JWT keys in Step 4 (PKI Job is not SCC-compatible) |
 | `server.disableTls=true` | Run gateway in plaintext for evaluation. TLS would require cert-manager. |
 | `server.auth.allowUnauthenticatedUsers=true` | No authentication on the cluster-internal workshop gateway |
-| `podSecurityContext.fsGroup=null` | Clear the chart's hardcoded `fsGroup: 1000` so OpenShift SCC can assign |
-| `securityContext.runAsUser=null` | Clear the chart's hardcoded `runAsUser: 1000` so OpenShift SCC can assign |
+| `podSecurityContext.fsGroup=null` | Clear the chart's hardcoded `fsGroup` so OpenShift SCC can assign |
+| `securityContext.runAsUser=null` | Clear the chart's hardcoded `runAsUser` so OpenShift SCC can assign |
 
-The chart and workshop CLI are both pinned to `0.0.103`.
+The chart is pinned to `0.1.2` with the gateway image digest-pinned to
+`0.1.2-rhaiv.0` — the same build as the workshop CLI.
 
 ### Step 6: Wait for the gateway
 
@@ -209,7 +221,7 @@ oc -n openshell port-forward svc/openshell 8080:8080
 Tell the CLI where the gateway is from another terminal:
 
 ```bash
-openshell gateway add http://127.0.0.1:8080 --local --name local-gateway
+openshell gateway add http://host.containers.internal:8080 --local --name local-gateway
 openshell gateway select local-gateway
 ```
 
@@ -378,7 +390,9 @@ oc adm policy who-can use scc privileged -n openshell
 **openshell CLI `connection refused` or `Disconnected`:**
 Verify that `oc -n openshell port-forward svc/openshell 8080:8080` is
 still running and that `openshell gateway list` shows
-`http://127.0.0.1:8080` for the `local-gateway` gateway.
+`http://host.containers.internal:8080` for the `local-gateway` gateway.
+Remember: `127.0.0.1` inside the CLI's Podman container is not the host —
+use `host.containers.internal`.
 
 **Sandbox stuck in `Creating` state:**
 Check sandbox pod events for image pull or SCC issues:
