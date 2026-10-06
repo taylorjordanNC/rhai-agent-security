@@ -102,8 +102,14 @@ fi
 echo "Enabling kv-v2 engine at path 'secret' (idempotent)"
 vault secrets list -format=json | grep -q '"secret/"' || vault secrets enable -path=secret kv-v2
 
-echo "Enabling kubernetes auth at path 'hub' (idempotent)"
-vault auth list -format=json | grep -q '"hub/"' || vault auth enable -path=hub kubernetes
+# Re-create the auth mount on every run. The vault's config write is a
+# partial update, so a previously-baked token_reviewer_jwt (the job's
+# short-lived token) can never be cleared by a later write - and once it
+# expires, TokenReview 403s break every ESO login. disable+enable is the
+# only way to start from a clean config; with no token_reviewer_jwt set,
+# vault uses its own auto-rotated projected SA token for TokenReviews.
+vault auth disable hub 2>/dev/null || true
+vault auth enable -path=hub kubernetes
 
 echo "Writing auth/hub/config"
 vault write auth/hub/config \
