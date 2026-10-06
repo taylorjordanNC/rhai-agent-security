@@ -19,12 +19,14 @@ instance.
 
 ## Prerequisites of this Application
 
-1. **SAW deployment up** (module 3, optional; the fleet script or the
-   participant's module 3 run): `openshell-agents` namespace, the governance
-   interceptor with the capstone fleet egress ceilings, Keycloak, and the
-   fleet sandboxes (`metrics`, `traces`, `analyst`) provisioned by the
-   `saw-bom` chart via `apply_bom.py` on the workspace VM. Those stay in the
-   SAW fork's GitOps. The child holds in Argo retry until SAW is healthy.
+1. **SAW deployment up** (module 3, optional; the gitops deployment or the
+   participant's module 3 run): the governance interceptor with the capstone
+   fleet egress ceilings, Keycloak, and the per-user workspace VM. The fleet
+   sandboxes (`metrics`, `traces`, `analyst`) are participant-provisioned in
+   module 7 (the CLI at sandbox create with the pinned policies from
+   `automation/policies/sandbox-policy-fleet-*.yaml`) — the in-guest BOM
+   installer does not provision them, so module 7's provisioning step is the
+   single source. The child holds in Argo retry until SAW is healthy.
 2. **RHOAI MLflow operator installed** (cluster baseline) — the operator
    reconciles the `MLflow` CR in wave 1.
 3. **`mlflow-workspace=true` label on the `openshell` namespace** — set
