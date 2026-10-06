@@ -1,0 +1,125 @@
+# Vault image mirror — PreSync hook (runs before the saw-vault app's own
+# sync, so the pinned images exist before the StatefulSet pulls them).
+#
+# The images live in this namespace (vault), not the workshop's shared
+# openshell-agents mirror: the vault SA pulls from its own namespace through
+# the default system:image-pullers group binding, and the mirror SA pushes
+# through the RoleBinding below. Namespace-local, no cross-namespace grants.
+#
+# Hook-style on purpose (the capstone's image-mirror pattern): Argo runs these
+# once per sync and does not reconcile them as live resources, so a
+# participant's manual mirror never fights a reconciler. skopeo re-copies of
+# already-mirrored images are cheap (blob-existence checks).
+# BeforeHookCreation cleans the Job at the next sync, keeping logs on-cluster:
+#   oc logs job/vault-image-mirror -n vault
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-image-mirror
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "-1"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vault-image-mirror-builder
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "-1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-builder
+subjects:
+- kind: ServiceAccount
+  name: vault-image-mirror
+---
+# GitOps-compatible SCC grant: a Role with the `use` verb on the named SCC +
+# a standard RoleBinding. An SCC-roleRef RoleBinding is valid on OpenShift,
+# but Argo's RBAC validation (kubectl auth reconcile) rejects that roleRef
+# kind — this form validates and reconciles cleanly.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vault-image-mirror-use-nonroot-scc
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "-1"
+rules:
+- apiGroups: ["security.openshift.io"]
+  resources: ["securitycontextconstraints"]
+  resourceNames: ["nonroot"]
+  verbs: ["use"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vault-image-mirror-nonroot-scc
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "-1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: vault-image-mirror-use-nonroot-scc
+subjects:
+- kind: ServiceAccount
+  name: vault-image-mirror
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-image-mirror
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 900
+  template:
+    metadata:
+      annotations:
+        argocd.argoproj.io/hook: PreSync
+        argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+        argocd.argoproj.io/sync-wave: "-1"
+    spec:
+      serviceAccountName: vault-image-mirror
+      restartPolicy: Never
+      containers:
+      - name: mirror
+        image: registry.redhat.io/ubi8/skopeo:latest
+        env:
+        - name: HOME
+          value: /tmp/skopeo-home
+        - name: XDG_RUNTIME_DIR
+          value: /tmp/xdg-runtime
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          mkdir -p "${HOME}" "${XDG_RUNTIME_DIR}"
+          TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+          REGISTRY="image-registry.openshift-image-registry.svc:5000"
+          for image in "vault:1.21.2" "vault-k8s:1.7.2"; do
+            NAME="${image%%:*}"
+            TAG="${image##*:}"
+            if skopeo inspect --tls-verify=false \
+                "docker://${REGISTRY}/vault/${NAME}:${TAG}" >/dev/null 2>&1; then
+              echo "Already mirrored: ${NAME}:${TAG}"
+              continue
+            fi
+            echo "Mirroring ${NAME}:${TAG}..."
+            skopeo copy --src-tls-verify=true --dest-tls-verify=false \
+              --dest-creds="unused:${TOKEN}" \
+              "docker://docker.io/hashicorp/${NAME}:${TAG}" \
+              "docker://${REGISTRY}/vault/${NAME}:${TAG}"
+            echo "Mirror complete: ${NAME}:${TAG}"
+          done

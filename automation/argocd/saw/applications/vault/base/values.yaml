@@ -1,12 +1,20 @@
 # Vault image overrides — this cluster's node-level registry config redirects
 # docker.io to registry.connect.redhat.com, which does not carry the vault
-# images. Mirror them to the internal registry (the workshop's mirror flow)
-# and reference the in-cluster DNS name.
+# images. The PreSync hook in vault-image-mirror.yaml mirrors them into this
+# namespace and references the in-cluster DNS name: the vault SA pulls from
+# its own namespace through the default system:image-pullers group binding,
+# and the mirror SA pushes through its RoleBinding. Namespace-local, no
+# cross-namespace grants.
+#
+# The agent injector is off: nothing in this pattern uses vault-agent sidecar
+# injection (ESO reads the vault API over in-cluster HTTP), and the injector
+# pod's fixed runAsUser/fsGroup fails SCC admission in a restricted namespace.
 server:
   image:
-    repository: image-registry.openshift-image-registry.svc:5000/openshell-agents/vault
+    repository: image-registry.openshift-image-registry.svc:5000/vault/vault
     tag: "1.21.2"
 injector:
+  enabled: false
   image:
-    repository: image-registry.openshift-image-registry.svc:5000/openshell-agents/vault-k8s
+    repository: image-registry.openshift-image-registry.svc:5000/vault/vault-k8s
     tag: "1.7.2"
