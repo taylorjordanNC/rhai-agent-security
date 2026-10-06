@@ -68,9 +68,12 @@ Provided by the facilitators:
 
 Rules:
 
-* Match the client to its gateway: `{openshell_version}` for the raw OpenShell
-  track, `{openshell_saw_version}` for the SAW guest gateway. Do not mix
-  client and gateway versions.
+* Match the client to its gateway: the workshop ships **two OpenShell
+  clients**. The raw OpenShell track (Modules 1 and 2) uses the tarball
+  client pinned to `{openshell_version}`, installed below. The SAW track
+  (Module 3 onward) uses the RHAIV-packaged OpenShell CLI **container**,
+  `{openshell_saw_version}` — not a newer tarball or Homebrew build. Do not
+  mix client and gateway versions.
 * The raw policy track requires no model API key; the SAW track's key is
   facilitator-provisioned through the secret contract.
 * The standalone NemoClaw CLI (`nemoclaw onboard`, local container-runtime
@@ -122,7 +125,7 @@ for tool in oc helm git curl openssl make; do
 done
 oc version --client
 helm version
-test "$(openshell --version | awk '{print $NF}')" = "{openshell_version}"
+test "$("$HOME/openshell-cli/openshell" --version | awk '{print $NF}')" = "{openshell_version}"
 ----
 
 Expected result: every tool prints its install path. The final `test` line is
@@ -144,6 +147,43 @@ Expected result: the same — every path printed, `virtctl` reporting a client
 version, and the PyYAML import exiting silently when present. The SAW guest
 gateway reports the `{openshell_saw_version}` build — the expected Red Hat SAW
 packaging suffix on the same compatibility line.
+
+For the SAW track, run the OpenShell CLI as a container instead of the raw
+tarball client. The image ENTRYPOINT is the CLI and its `HOME` is `/`, so the
+config mount target is `/.config/openshell` (not `/root/.config`); use
+`--platform linux/amd64` on Apple Silicon hosts:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+podman run --rm --platform linux/amd64 \
+  -v "$HOME/.config/openshell:/.config/openshell" \
+  {openshell_cli_image} --version   # expect {openshell_saw_version}
+----
+
+To make `openshell` resolve to the container CLI while working the SAW
+modules — including the modules' `make` targets, whose recipe shells are
+non-interactive `/bin/sh` and do not expand aliases — write a PATH wrapper
+instead of a shell alias:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+mkdir -p "$HOME/.local/bin"
+cat > "$HOME/.local/bin/openshell" <<'EOF'
+#!/bin/bash
+exec podman run --rm --platform linux/amd64 \
+  -v "$HOME/.config/openshell:/.config/openshell" \
+  {openshell_cli_image} \
+  "$@"
+EOF
+chmod 0755 "$HOME/.local/bin/openshell"
+----
+
+Ensure `~/.local/bin` is on `PATH` (add `export PATH="$HOME/.local/bin:$PATH"`
+to your shell profile if it is not). A wrapper works in both interactive
+shells and `make` recipe shells. Keep the two clients distinct: the
+`{openshell_version}` tarball for the raw track (its own
+`$HOME/openshell-cli` prefix on `PATH`), this container wrapper for the SAW
+track.
 
 == Get the workshop checkouts
 

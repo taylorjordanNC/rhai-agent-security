@@ -136,11 +136,8 @@ across the fleet: it exits non-zero if any cluster is not ready.
 The PostSync seed job — it runs after every successful Argo CD sync — plants
 the agent-session traces of a *prior* incident
 (`INC-4127`) into MLflow — the data the traces agent investigates below —
-and re-plants idempotently on each sync. What stays with the facilitator:
+and re-plants idempotently on each sync. What stays with you:
 
-* the fleet sandbox names (`metrics`, `traces`, `analyst`) on
-  `{saw_gateway_name}` (provisioned by the `saw-bom` chart via
-  `apply_bom.py` on the workspace VM), and
 * the sandbox hand-off files the module's exec commands read:
   xref:attachment$plant-incident-traces.sh[plant-incident-traces.sh] run on
   the workspace VM stages `/tmp/incident-search.json`,
@@ -149,9 +146,37 @@ and re-plants idempotently on each sync. What stays with the facilitator:
   stages `/tmp/sa.token`, a read-only bearer token, in the `metrics`
   sandbox environment.
 
-The fleet sandboxes are provisioned in the gateway's default workspace, so
-the exec commands below omit `--workspace`. If your BOM provisions them in
-`{saw_workspace}`, add `--workspace {saw_workspace}` to each command and set
+== Provision the fleet
+
+The three fleet sandboxes are yours to create — the same way an enterprise
+deploys a governance-scoped agent fleet: policies reviewed in git, applied at
+sandbox create. The three policy manifests ship with this workshop's
+automation (`{automation_repo}/policies/sandbox-policy-fleet-*.yaml`), and
+the governance interceptor signs each policy at create time — it only signs
+network access it governs, so a policy naming an undeclared backend fails
+closed.
+
+From your workstation, with the gateway selected and logged in (module 4):
+
+[source,bash,role="execute",subs="attributes+"]
+----
+for agent in metrics traces analyst; do
+  openshell --gateway {saw_gateway_name} sandbox create --name "$agent" \
+    --from quay.io/rh-ai-quickstart/nemoclaw-sandbox:latest \
+    --policy "{automation_repo}/policies/sandbox-policy-fleet-$agent.yaml" \
+    --no-tty --detach -- sh -c 'sleep 86400'
+done
+openshell --gateway {saw_gateway_name} sandbox list
+----
+
+Pass condition: three sandboxes (`metrics`, `traces`, `analyst`) report
+Ready. The fleet agents are CLI-driven and attach no inference provider —
+the analyst's zero egress depends on it. Pin the image the same way the BOM
+does: the `nemoclaw-sandbox` base the workshop mirrors.
+
+The fleet sandboxes live in the gateway's default workspace, so the exec
+commands below omit `--workspace`. If you create them in `{saw_workspace}`,
+add `--workspace {saw_workspace}` to each command and set
 `WORKSPACE={saw_workspace}` for the GUI tunnel in Exercise 3.
 
 Resolve the MLflow experiment id once and keep it in your VM shell — every

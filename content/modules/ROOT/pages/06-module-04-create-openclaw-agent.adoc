@@ -34,8 +34,8 @@ exercise maps onto one of their components:
 | NVIDIA NemoClaw
 | The agent runtime and packaging model: OpenClaw lifecycle, onboarding,
   provider wiring, and the policy model
-| The BOM-configured NemoClaw runtime inside the VM; the setup Job provisions
-  OpenClaw sandboxes through the OpenShell gateway at deploy time
+| The BOM-configured NemoClaw runtime inside the VM; the in-VM installer
+  provisions OpenClaw sandboxes through the OpenShell gateway at deploy time
 
 | OpenClaw
 | The agent process, tools, workspace, and Control UI
@@ -51,7 +51,7 @@ exercise maps onto one of their components:
 The standalone `nemoclaw onboard` workflow is not used because the runtime's
 lifecycle job is performed at deploy time: the BOM (bill of materials — the
 manifest listing exactly which agent image and components ship) configures the
-NemoClaw runtime in the VM, and its setup Job onboards OpenClaw and wires the
+NemoClaw runtime in the VM, and its in-VM installer onboards OpenClaw and wires the
 inference provider through the OpenShell gateway. Module 1 showed OpenClaw running on the
 raw OpenShell pod boundary; this module shows the same agent inside the
 production-shaped VM boundary with the runtime, OIDC, and secrets around it.
@@ -63,26 +63,28 @@ The facilitator must provide these items for a pre-provisioned environment:
 * the SAW checkout on the control node — if the facilitator has not provided
   it, clone it: `git clone --branch {saw_repo_branch} {saw_repo_url}`;
 * an OIDC account whose subject a platform admin has added to the assigned
-  workspace with `workspace member add` (the setup Job does not grant
+  workspace with `workspace member add` (the installer does not grant
   human-identity membership — see Exercise 1);
 * read access to `{saw_namespace}` and `{saw_gitops_namespace}`;
 * the generated SSH key required by the native configuration target; and
-* a completed setup Job and running VM.
+* a completed prepare Job and running VM.
 
-The SAW BOM and setup Job configure the agent image, inference routing,
+The SAW BOM and in-VM installer configure the agent image, inference routing,
 Vault-backed credentials, policy profiles, and sandbox lifecycle. Run all
 commands from the SAW checkout root on the control node — the machine
 holding the SAW SSH key and `virtctl`. A RHEL 10 or Fedora bastion is the
 supported control node; a macOS workstation with the same tools also works,
 and Windows participants use the validated WSL2 path. Nothing in this module
-runs inside the workspace VM directly: the RHEL guest is configured only by
-the setup Job over SSH from the cluster. The Keycloak browser login is the
-only environment-independent step.
+runs inside the workspace VM directly: the RHEL guest is configured by the
+GitOps deployment — the cluster-side prepare Job stages the golden image and
+dashboard redirect, and the in-VM installer (the BOM apply over cloud-init)
+configures the workspaces, providers, and sandboxes. The Keycloak browser
+login is the only environment-independent step.
 
 == Learning objectives
 
 * Configure and authenticate the SAW gateway entry.
-* Verify the VM, setup Job, BOM workspaces, and gateway version.
+* Verify the VM, prepare Job, BOM workspaces, and gateway version.
 * Diagnose an incomplete workspace from Argo CD, Job, VM, and gateway evidence.
 * Run OpenClaw through the SAW NemoClaw path and identify the credential boundary.
 
@@ -104,7 +106,7 @@ openshell-saw-configure-gateway` caches that token for the CLI.
 Workspace membership is not automatic for human identities. Logging in gets
 you a token, but the gateway separately checks a per-workspace member list
 before it lets you touch a workspace — and the automated setup only added the
-machine identity, not you. The SAW setup Job
+machine identity, not you. The in-VM installer
 provisions workspaces and grants membership only to the in-VM
 `openshell-client` service identity, so your OIDC identity starts with no
 membership in `{saw_workspace}` or `default`. The first workspace-scoped CLI
@@ -138,12 +140,12 @@ Confirm the infrastructure state before entering the agent sandbox:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-oc -n {saw_namespace} get job/{saw_gateway_name}-setup \
+oc -n {saw_namespace} get job/{saw_gateway_name}-prepare \
   vm/{saw_gateway_name} vmi/{saw_gateway_name}
 oc -n {saw_gitops_namespace} get applications.argoproj.io
 ----
 
-Expected result: the setup Job is `Complete`, the VMI is `Running`, and the
+Expected result: the prepare Job is `Complete`, the VMI is `Running`, and the
 owning Argo CD applications are `Synced` and `Healthy`. This is the
 reconciliation chain: GitOps owns the pattern, the pattern owns the Job, and
 the Job configures the VM.
@@ -153,7 +155,7 @@ the Job configures the VM.
 ====
 [source,bash,subs="attributes+"]
 ----
-test "$(oc -n {saw_namespace} get job/{saw_gateway_name}-setup \
+test "$(oc -n {saw_namespace} get job/{saw_gateway_name}-prepare \
   -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}')" = "True"
 test "$(oc -n {saw_namespace} get vmi/{saw_gateway_name} \
   -o jsonpath='{.status.phase}')" = "Running"
@@ -169,10 +171,13 @@ Validate the BOM-created workspaces and sandboxes:
 
 include::secure-agent-workspace:ROOT:partial$deployment/validate.adoc[]
 
-The guest gateway must report `{openshell_saw_version}`, the control-node CLI
-must report `{openshell_version}`, the setup Job must be complete, and the VMI
-must be running. The default workspace must contain `notebook`, `cuda-sandbox`,
-and `toolbox`; `{saw_workspace}` must contain `{saw_sandbox}` and `toolbox`.
+The guest gateway must report `{openshell_saw_version}`, the control-node SAW
+CLI (the RHAIV container wrapper) must also report `{openshell_saw_version}`, the
+prepare Job must be complete, and the VMI must be running. The default workspace must contain `notebook`;
+`{saw_workspace}` must contain `{saw_sandbox}`. The BOM profiles disable the
+colliding duplicate sandboxes (`cuda-sandbox`/`toolbox` in the default
+workspace, `toolbox` in `{saw_workspace}`) — the enabled set is what the
+module verifies.
 
 == Exercise 3: Diagnose an incomplete deployment
 
@@ -185,32 +190,33 @@ below it can be trusted:
 oc -n {saw_gitops_namespace} get applications.argoproj.io
 ----
 
-The setup Job configures the VM over SSH; a failed Job means the VM exists but
-the runtime inside it was never onboarded:
+The prepare Job stages the golden image and hands off to the in-VM installer;
+a failed Job means the VM exists but the runtime inside it was never onboarded:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-oc -n {saw_namespace} get job/{saw_gateway_name}-setup \
+oc -n {saw_namespace} get job/{saw_gateway_name}-prepare \
   vm/{saw_gateway_name} vmi/{saw_gateway_name}
-oc -n {saw_namespace} logs job/{saw_gateway_name}-setup --tail=80
+oc -n {saw_namespace} logs job/{saw_gateway_name}-prepare --tail=80
 ----
 
-The setup Job log names the failing onboarding step; the sandbox list shows
-what the gateway actually provisioned:
+The prepare Job log — and the in-VM installer log in the virt-launcher pod's
+`guest-console-log` container — name the failing onboarding step; the sandbox
+list shows what the gateway actually provisioned:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
 openshell --gateway {saw_gateway_name} sandbox list --workspace {saw_workspace}
 ----
 
-Use the first failing layer as the recovery boundary. Do not delete the setup
-Job until the owning Argo CD application is healthy and you know how it will be
+Use the first failing layer as the recovery boundary. Do not delete the
+prepare Job until the owning Argo CD application is healthy and you know how it will be
 recreated. If the token alone has expired, run
 `openshell gateway login {saw_gateway_name}` instead of reconfiguring the VM.
 
 == Exercise 4: Launch OpenClaw in the NemoClaw sandbox
 
-The SAW setup Job provisions the `nemoclaw` sandbox from the configured BOM. Use
+The SAW prepare Job provisions the `nemoclaw` sandbox from the configured BOM. Use
 the Makefile target to connect to it:
 
 [source,bash,role="execute",subs="attributes+"]

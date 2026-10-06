@@ -9,7 +9,7 @@ content:
     - url: .
       start_path: content
     - url: https://github.com/taylorjordanNC/secure-agent-workspace.git
-      branches: saw-emulation-fixes
+      branches: workshop
       start_path: docs/antora
 
 ui:

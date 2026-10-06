@@ -4,16 +4,18 @@
 This module installs Secure Agent Workspace (SAW) on the OpenShift cluster —
 the production-shaped environment from the architecture overview: a dedicated
 VM per workspace owner, with login, secrets, and GitOps governance around it.
-Skip this module when the facilitator has already deployed SAW with the fleet
-install script (one command that stands up SAW for the whole workshop). Either
-way, SAW must be up before class: Module 4 assumes the environment is
-running.
+Skip this module when the facilitator has already deployed SAW with the
+GitOps deployment (the `saw-gitops` app-of-apps — one apply that stands up
+SAW for the whole workshop). Either way, SAW must be up before class: Module
+4 assumes the environment is running.
 
 include::secure-agent-workspace:ROOT:partial$deployment/scope.adoc[]
 
-The operational sections below are included from that fork's canonical
-deployment guide. Update the shared partials in the SAW repository when a
-deployment command changes; do not duplicate the procedure in this repository.
+The control-node and secrets sections below are included from that fork's
+canonical deployment guide. Update the shared partials in the SAW repository
+when a deployment command changes; do not duplicate the procedure in this
+repository. The deployment itself is this workshop's GitOps path — the
+`saw-gitops` app-of-apps in `{gitops_root}`.
 
 == Deployment scope
 
@@ -29,24 +31,26 @@ environments. This installation adds, in one pass:
   sandbox operations; and
 * GitOps-managed configuration, with Argo CD keeping the cluster matching Git.
 
-Use a dedicated workshop cluster. The pattern installs cluster-scoped operators
-and OpenShift Virtualization resources; its uninstall path can affect other
-virtualization workloads.
+Use a dedicated workshop cluster. The GitOps deployment installs
+cluster-scoped operators and OpenShift Virtualization resources; its
+uninstall path can affect other virtualization workloads.
 
 == Learning objectives
 
 * Select a supported control node and verify OpenShift Virtualization capacity.
 * Prepare SAW SSH keys and provider secret values without committing credentials.
-* Mirror the required images — copy them from their upstream registries into
-  your cluster's registry — and install the Validated Pattern (Red Hat's
-  reference deployment).
-* Identify the installation stop condition and collect failure diagnostics.
+* Deploy SAW declaratively — the `saw-gitops` app-of-apps — and seed the
+  cluster's Vault with the provider values (image mirroring is automated by
+  PreSync hook Jobs).
+* Identify the deployment stop condition and collect failure diagnostics.
 
 == Have your API keys ready
 
 Two provider API keys are required during this module's secrets step. You
 provide them yourself — they are never committed to git and never leave your
-control node except into the cluster's secret manager:
+control node except into the cluster's secret manager. (If your facilitator
+already seeded the shared provider keys for this cluster, skip this section and
+the seeding step in Exercise 3 — facilitator-led participants do not seed.)
 
 [cols="1,2,2"]
 |===
@@ -95,29 +99,70 @@ include::secure-agent-workspace:ROOT:partial$deployment/cluster-prerequisites.ad
 
 include::secure-agent-workspace:ROOT:partial$deployment/clone-and-secrets.adoc[]
 
-== Exercise 3: Mirror images and install the pattern
+== Exercise 3: Deploy SAW with GitOps
 
-include::secure-agent-workspace:ROOT:partial$deployment/install.adoc[]
+The workshop deploys SAW declaratively. The `saw-gitops` root application
+applies the hub children in sync-wave order — namespaces, operators, Vault,
+External Secrets, OpenShift Virtualization, the pattern secrets, Keycloak,
+the governance interceptor, the BOM, and the per-user workspace VM. Image
+mirroring is automated: PreSync hook Jobs copy every required image into the
+cluster's registry before the applications that need them sync.
 
-== Installation stop condition
-
-Do not continue until the setup Job is `Complete` and the VM instance is
-`Running`:
+If the RHDP order already deployed the workshop chart, the root application
+exists — skip to the verification below. Otherwise apply it once:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-oc -n {saw_namespace} wait --for=condition=complete \
-  job/{saw_gateway_name}-setup --timeout=5400s
-test "$(oc -n {saw_namespace} get vmi {saw_gateway_name} \
-  -o jsonpath='{.status.phase}')" = "Running"
+oc apply -f {gitops_root}/saw/root-application.yaml
 ----
 
-In short: the setup Job — the job that configures the VM — finished, and the
-VM is up.
+Watch the tree converge. The vault-config Job initializes and unseals Vault,
+configures the Kubernetes auth role, and the ExternalSecrets resolve the
+values you seeded in Exercise 2 (run the seed step there once the tree is
+converged — the script tells you if the `vault-init` Secret is not there
+yet):
 
-If either assertion fails, use the installation diagnostics before retrying:
+[IMPORTANT]
+====
+If your facilitator already seeded the shared provider keys for this cluster
+(the facilitator guide's `seed-vault.sh` step), **skip this seeding step** — do
+not re-seed a cluster that is already provisioned.
+====
 
-include::secure-agent-workspace:ROOT:partial$deployment/troubleshooting.adoc[]
+[source,bash,role="execute",subs="attributes+"]
+----
+oc get applications -n {gitops_namespace}
+./scripts/seed-vault.sh   # from the SAW repository root, after convergence
+oc get externalsecrets -n openshell-agents   # SecretSynced — the pattern secrets
+                                             # (provider/governance keys) sync in
+                                             # the SAW infra namespace, not the
+                                             # per-user {saw_namespace} VM namespace
+----
+
+== Deployment stop condition
+
+Do not continue until the `saw-gitops` tree is Synced and Healthy, the
+workspace VM is `Running`, and the cluster-side prepare Job is `Complete`:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+test "$(oc -n {gitops_namespace} get application saw-users \
+  -o jsonpath='{.status.health.status}')" = "Healthy"
+test "$(oc -n {saw_namespace} get vmi {saw_gateway_name} \
+  -o jsonpath='{.status.phase}')" = "Running"
+oc -n {saw_namespace} wait --for=condition=complete \
+  job/{saw_gateway_name}-prepare --timeout=3600s
+----
+
+In short: the GitOps tree converged, the VM is up, and the prepare Job — the
+job that stages the golden image DataSource and the dashboard's Keycloak
+redirect — finished. The VM configures itself in-guest; its installer logs
+to the virt-launcher pod's `guest-console-log` container.
+
+If either check fails, use the installation diagnostics before retrying: the
+one object to read is the stuck application
+(`oc get applications -n {gitops_namespace}` — the failing `saw-*` app's
+conditions name the wave that did not converge).
 
 Continue to xref:06-module-04-create-openclaw-agent.adoc[Module 4: Validate and
 Operate Secure Agent Workspace]. That module is the common path for

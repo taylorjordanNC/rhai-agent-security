@@ -212,9 +212,9 @@ Then the consumption side:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-oc -n {saw_namespace} get job/{saw_gateway_name}-setup \
+oc -n {saw_namespace} get job/{saw_gateway_name}-prepare \
   -o jsonpath='{.spec.template.spec.serviceAccountName}{"\n"}'
-oc -n {saw_namespace} get job/{saw_gateway_name}-setup -o yaml | \
+oc -n {saw_namespace} get job/{saw_gateway_name}-prepare -o yaml | \
   grep -E 'secretKeyRef|secretName|serviceAccountName'
 ----
 

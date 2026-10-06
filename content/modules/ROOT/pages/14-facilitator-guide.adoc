@@ -30,70 +30,72 @@ cd ~/git/{saw_repo_dir} && make generate-keys
 
 [IMPORTANT]
 ====
-One shared inference key covers every cluster and every participant. Edit
-`~/values-secret.yaml` once: set `provider: build` and an
-link:https://docs.nvidia.com/ngc/gpu-cloud/ngc-user-guide/index.html#generating-api-key[NVIDIA NGC API key^]
-for the default `nvidia/nemotron-3-super-120b-a12b` model, with the key in a
-readable file (for example `~/.ngc-api-key`). The fleet install loads it into
-each cluster's Vault; the gateway-side provider holds it and participants
-never see it — no participant step prompts for a model key on the SAW track.
-Check the key's quota: one key serves every agent turn across all clusters,
-though consumption is modest. Module 8 needs no facilitator key —
-participants obtain their own Model-as-a-Service key and enter it at install
-time.
-====
-
-OpenShift-GitOps / ArgoCD must be enabled in the OpenShift cluster. On RHDP
-orders the order's gitops path deploys the workshop chart
-(`{automation_repo}/argocd`), whose template creates the `module-7-prereqs`
-child directly. On a cluster without the order pointer, apply the child once:
+In a facilitator-led workshop, Vault seeding is a FACILITATOR step — the
+facilitator seeds the shared provider keys once per cluster; participants
+never seed. Self-paced participants running the modules alone seed their own
+keys in module 3. The shared provider keys cover every cluster and every
+participant. Edit
+`~/values-secret.yaml` once: set the NVIDIA NGC API key for the default
+`nvidia/nemotron-3-super-120b-a12b` model and a Tavily key for web search,
+each in a readable file (for example `~/.ngc-api-key`,
+`~/.tavily-api-key`). Seed them into each cluster's Vault with the fork's
+seeding script — run it once per cluster, after that cluster's `saw-gitops`
+tree has converged (the script reads the `vault-init` Secret the
+vault-config Job creates and tells you if the tree is not there yet):
 
 [source,bash,subs="attributes+"]
 ----
+KUBECONFIG=<cluster-kubeconfig> ~/git/{saw_repo_dir}/scripts/seed-vault.sh
+----
+
+The gateway-side providers hold the keys and participants never see them —
+no participant step prompts for a model key on the SAW track. Each
+participant's workstation seeds its *own* SSH key (module 3, in the
+clone-and-secrets flow): the SSH key is
+always a per-user step, never a shared one. Module 8 needs no facilitator
+key — participants obtain their own Model-as-a-Service key and enter it at
+install time.
+====
+
+The workshop deploys declaratively: the RHDP order's gitops path deploys the
+workshop chart (`{automation_repo}/argocd`), whose templates create the
+`saw-gitops` root application (the SAW tree: operators, Vault, External
+Secrets, Virtualization, Keycloak, governance, the BOM, and the per-user
+workspace VMs) and the `module-7-prereqs` child (the capstone environment)
+directly in the cluster's `{gitops_namespace}` instance. On a cluster
+without the order pointer, apply both once:
+
+[source,bash,subs="attributes+"]
+----
+oc apply -f {automation_repo}/argocd/saw/root-application.yaml
 make -C {automation_repo} capstone-bootstrap
 ----
 
 [CAUTION]
 ====
-Skip the fleet install below when participants must go through the manual
-SAW setup themselves: a fleet-provisioned environment means Module 3 is
-already done, and the class loses that manual experience.
+When the GitOps deployment has already provisioned SAW, module 3 is already
+done — participants keep that time for the agent modules. Tell them so in
+the welcome notes.
 ====
 
-Fill `clusters.csv` from the RHDP orders (gitignored — never commit it) —
-even for a single cluster: one row is the only credential source, and
-`fleet-status.sh` reads the same file:
+Then watch each cluster converge: every `saw-*` application Synced and
+Healthy, the workspace VM `Running`, and the per-user prepare Job `Complete`:
 
 [source,bash,subs="attributes+"]
 ----
-cp {automation_repo}/fleet/clusters.csv.example {automation_repo}/fleet/clusters.csv
+oc get applications -n {gitops_namespace}
+oc -n saw-<user> get virtualmachine <user> \
+  -o jsonpath='{.status.printableStatus}'
+oc -n saw-<user> wait --for=condition=complete \
+  job/<user>-prepare --timeout=3600s
 ----
 
-Bootstrap one cluster by name — installs and blocks until `module-7-prereqs`
-is Synced/Healthy, so participants may proceed the moment it returns
-(~50-70 min). No `--jobs` needed:
+Seed the shared provider keys (the script above) once the tree has
+converged — the ExternalSecrets resolve them on their next refresh.
 
-[source,bash,subs="attributes+"]
-----
-./{automation_repo}/fleet/fleet-install.sh --only workshop-01
-----
-
-For a large order, fan out across the fleet:
-
-[source,bash,subs="attributes+"]
-----
-./{automation_repo}/fleet/fleet-install.sh --jobs 5
-----
-
-Timing: ~50-70 min per cluster (the pattern GitOps
-health loop ~30-50 min); VM setup continues in-cluster for ~1-3h after the
-install returns. 50 clusters: 5 workers ≈ 10h, 10 workers ≈ 5h. Knobs:
-`--wait` blocks per cluster until the setup Job completes, `--dry-run` prints
-the plan, `--no-emulation` for KVM-capable clusters only.
-
-Before `--jobs > 1`: commit and push local fork changes to
-{saw_repo_branch} — worker clones come from the fork, so uncommitted fixes
-are missing from them.
+`fleet-install.sh` (the Validated Patterns install loop) remains the
+fallback for clusters provisioned without the order pointer; `fleet-status.sh
+--gate` exits non-zero if any cluster in `clusters.csv` is not ready.
 
 == Verify every cluster
 
