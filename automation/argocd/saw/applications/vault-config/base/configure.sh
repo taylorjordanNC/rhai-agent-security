@@ -108,8 +108,10 @@ vault auth list -format=json | grep -q '"hub/"' || vault auth enable -path=hub k
 echo "Writing auth/hub/config"
 vault write auth/hub/config \
   kubernetes_host="$K8S_API" \
-  token_reviewer_jwt="$(k8s_token)" \
   kubernetes_ca_cert=@"$SA_CA"
+# No token_reviewer_jwt: with disable_local_ca_jwt unset (false), vault uses
+# its own projected SA token for TokenReviews - always fresh, auto-rotated.
+# Baking the job's short-lived token here caused TokenReview 403s after ~1h.
 
 echo "Writing policy 'hub'"
 vault policy write hub /policy/hub.hcl
