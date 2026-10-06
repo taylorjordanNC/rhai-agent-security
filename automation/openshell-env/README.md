@@ -68,6 +68,8 @@ port-forward and register the gateway, then continue with sandbox creation.
 | `NAMESPACE` | `openshell` | OpenShift namespace for all resources |
 | `OPENSHELL_VERSION` | `0.1.2` | Helm chart version (the gateway image is digest-pinned to 0.1.2-rhaiv.0 in `install.sh`) |
 | `OPENSHELL_SANDBOX_IMAGE` | Pinned `base` digest | Default sandbox image |
+| `OPENSHELL_SUPERVISOR_REPO` / `OPENSHELL_SUPERVISOR_DIGEST` | Pinned `odh-openshell-supervisor` digest (0.1.2-rhaiv.0) | Supervisor image, digest-pinned like the SAW track |
+| `OPENSHELL_SANDBOX_RUNTIME_REPO` / `OPENSHELL_SANDBOX_RUNTIME_DIGEST` | Pinned `odh-openshell-sandbox` digest (0.1.2-rhaiv.0) | Sandbox runtime image, digest-pinned like the SAW track |
 
 ## Step-by-Step Guide
 
@@ -168,6 +170,12 @@ helm install openshell oci://ghcr.io/nvidia/openshell/helm-chart \
     --set gateway.image.registry=quay.io \
     --set gateway.image.repository=opendatahub/odh-openshell-gateway \
     --set gateway.image.digest=sha256:c3b230a32245d0a6c35ed11c17cf590da9ede79dfb0378e3829e16709f63fba3 \
+    --set supervisor.image.registry=quay.io \
+    --set supervisor.image.repository=opendatahub/odh-openshell-supervisor \
+    --set supervisor.image.digest=sha256:0179eb17dcc0098d3fce360035c0be0c26a39949ce09a397c7c259bf728170ff \
+    --set sandboxRuntime.image.registry=quay.io \
+    --set sandboxRuntime.image.repository=opendatahub/odh-openshell-sandbox \
+    --set sandboxRuntime.image.digest=sha256:283838f9787bdd876ec8f110a5d5b5c752082a410f75173f0abf2533ae651989 \
     --set sandbox.image.repository=ghcr.io/nvidia/openshell-community/sandboxes/base \
     --set sandbox.image.digest=sha256:aeef1c63f00e2913ea002ccb3aaf925f338b5c5d70e63576f0d95c16a138044e \
     --set pkiInitJob.enabled=false \
@@ -182,6 +190,8 @@ helm install openshell oci://ghcr.io/nvidia/openshell/helm-chart \
 | Override | Reason |
 |----------|--------|
 | `gateway.image.{registry,repository,digest}` | Pin the RHAIV gateway image (0.1.2-rhaiv.0) by digest, matching the workshop CLI |
+| `supervisor.image.{registry,repository,digest}` | Pin the RHAIV supervisor image (0.1.2-rhaiv.0) by digest; the upstream mutable tag fails the RHAIV gateway's sandbox-policy validation and loops in discovery |
+| `sandboxRuntime.image.{registry,repository,digest}` | Pin the RHAIV sandbox runtime image (0.1.2-rhaiv.0) by digest; the upstream `dev` tag's provenance is rejected by the RHAIV gateway |
 | `sandbox.image.{repository,digest}` | Pin the default sandbox base image by digest |
 | `pkiInitJob.enabled=false` | We pre-created JWT keys in Step 4 (PKI Job is not SCC-compatible) |
 | `server.disableTls=true` | Run gateway in plaintext for evaluation. TLS would require cert-manager. |
@@ -189,8 +199,10 @@ helm install openshell oci://ghcr.io/nvidia/openshell/helm-chart \
 | `podSecurityContext.fsGroup=null` | Clear the chart's hardcoded `fsGroup` so OpenShift SCC can assign |
 | `securityContext.runAsUser=null` | Clear the chart's hardcoded `runAsUser` so OpenShift SCC can assign |
 
-The chart is pinned to `0.1.2` with the gateway image digest-pinned to
-`0.1.2-rhaiv.0` — the same build as the workshop CLI.
+The chart is pinned to `0.1.2` with the gateway, supervisor, and sandbox
+runtime images digest-pinned to the `0.1.2-rhaiv.0` builds — the same image
+line as the SAW track's BOM (`charts/openshell-saw/values.yaml`) and the
+workshop CLI.
 
 ### Step 6: Wait for the gateway
 
