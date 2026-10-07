@@ -15,7 +15,9 @@ spec:
     namespace: openshell-agents
   sources:
     - repoURL: https://github.com/taylorjordanNC/secure-agent-workspace
-      targetRevision: workshop
+      # TEMP for GTC demo: mailpit email-provider profile + ceiling entry live on
+      # the secure-agent-workspace `demo` branch; revert to `workshop` after demo.
+      targetRevision: demo
       path: charts/governance-policy
       helm:
         valueFiles:
