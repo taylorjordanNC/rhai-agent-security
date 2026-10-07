@@ -94,7 +94,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: mirror
-        image: registry.redhat.io/ubi8/skopeo:latest
+        image: registry.redhat.io/ubi8/skopeo@sha256:202bc39651750c071bb5d68dd419f6e1c34d89a16194131af7c6c3f359c82b38
         env:
         - name: HOME
           value: /tmp/skopeo-home
