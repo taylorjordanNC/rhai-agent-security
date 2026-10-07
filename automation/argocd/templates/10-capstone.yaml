@@ -29,7 +29,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/taylorjordanNC/rhai-agent-security.git
-    targetRevision: main
+    targetRevision: gitops-updates
     path: automation/argocd/capstone
   destination:
     server: https://kubernetes.default.svc
