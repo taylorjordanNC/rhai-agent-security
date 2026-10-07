@@ -1,4 +1,11 @@
-# Site values for the openshell-keycloak chart. Defaults are used: the RHBK
-# operator computes the route hostname; the openshell realm and clients ship
-# with the chart.
-{}
+# Site values for the openshell-keycloak chart. The RHBK operator computes the
+# route hostname; the openshell realm and clients ship with the chart.
+#
+# The realm import reads the test users' passwords from the
+# openshell-keycloak-user-passwords Secret, which this ExternalSecret syncs
+# from Vault (values-secret keycloak-users, seeded by scripts/seed-vault.sh).
+# Without it the realm import job cannot start (CreateContainerConfigError).
+keycloak:
+  userPasswords:
+    externalSecret:
+      enabled: true
