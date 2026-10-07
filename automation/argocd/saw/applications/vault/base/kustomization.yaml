@@ -2,6 +2,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: vault
+resources:
+  # PreSync hook Job that mirrors the vault images into the vault namespace;
+  # must be rendered by kustomize or it never deploys on fresh clusters.
+  - vault-image-mirror.yaml
 helmGlobals:
   chartHome: charts
 helmCharts:

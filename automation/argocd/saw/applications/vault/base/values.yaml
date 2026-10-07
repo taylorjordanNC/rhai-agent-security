@@ -9,6 +9,11 @@
 # The agent injector is off: nothing in this pattern uses vault-agent sidecar
 # injection (ESO reads the vault API over in-cluster HTTP), and the injector
 # pod's fixed runAsUser/fsGroup fails SCC admission in a restricted namespace.
+# Enable the chart's own OpenShift mode: the templates then skip the
+# hardcoded runAsUser/fsGroup/hostNetwork and let the restricted-v2 SCC
+# assign the UID/fsGroup to the vault pods.
+global:
+  openshift: true
 server:
   image:
     repository: image-registry.openshift-image-registry.svc:5000/vault/vault
