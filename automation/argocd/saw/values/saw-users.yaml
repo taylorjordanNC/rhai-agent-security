@@ -6,7 +6,9 @@
 global:
   repoURL: https://github.com/taylorjordanNC/secure-agent-workspace
   targetRevision: workshop
-  clusterDomain: cluster-94vdw.dyn.redhatworkshops.io
+  # Current test-cluster order: cluster-ldxgj (the previous order,
+  # cluster-94vdw, was recycled).
+  clusterDomain: cluster-ldxgj.dyn.redhatworkshops.io
   pattern: secure-agent-workspace
   vpArgoNamespace: openshift-gitops
 argo:
