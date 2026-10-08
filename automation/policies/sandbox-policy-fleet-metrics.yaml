@@ -1,6 +1,6 @@
 # OpenShell SandboxPolicy for the `metrics` fleet agent — deny-by-default.
 # The metrics specialist may reach ONLY the Thanos querier (Prometheus API,
-# telemetry-proxy:8080) with curl/node; everything else is denied. A subset of
+# telemetry-proxy:8080) with node; everything else is denied. A subset of
 # the governance interceptor's observability-egress ceiling (the interceptor
 # only signs access it governs). Module 7 applies this at sandbox create:
 #   openshell --gateway <gateway> sandbox create --name metrics \
@@ -47,4 +47,3 @@ network_policies:
     binaries:
       - path: /usr/bin/node
       - path: /usr/local/bin/node
-      - path: /usr/bin/curl

@@ -3,9 +3,9 @@
 
 The capstone extension runs a three-agent observability fleet — three
 specialist agents, each with its own narrow permission — against the
-deployed Secure Agent Workspace. Participants verify governance-signed
-per-agent access, investigate live telemetry, drive a real outage in the
-browser, and confirm the remediation as a human.
+deployed Secure Agent Workspace. Participants verify the governance-signed
+network ceiling live, watch the East-West wall hold, drive a real outage
+in the browser, and confirm the remediation as a human.
 
 Prerequisites: SAW up and Module 4's client configuration only — the
 raw OpenShell modules (1-2) are not a prerequisite, so time-constrained
@@ -56,13 +56,24 @@ between the gateway and every sandbox creation: it *signs* each sandbox's
 policy, *vends* the provider profiles agents may use, and *rejects* any
 operation that falls outside the governance baseline — fail-closed.
 
-For this module the interceptor vends per-agent *network ceilings*: each
-fleet agent's policy names the one backend it may reach, the interceptor
-signs that policy, and the sandbox may *narrow* the baseline but never
-widen it. The signed policy is what the sandbox runtime enforces — so the
-"guest list" is not an agent's promise, it is governance-enforced fact.
-Every claim in this module is verified from outside the agent by paired
-probes and audit evidence, never taken from the agent's own output.
+For this module the interceptor vends the fleet's *network ceiling*: the
+signed policy the sandbox runtime actually enforces. On this release
+(0.1.2-rhaiv.0) every fleet sandbox — however scoped its `--policy` at
+create — is enforced against the same interceptor-signed ceiling, and that
+ceiling draws two lines that are verified live below:
+
+* *East-West protection:* in-cluster service addresses are absent from the
+  ceiling, so a fleet sandbox cannot reach *any* internal service — not the
+  telemetry proxy, not a database, not a neighboring pod. An agent sandbox
+  cannot wander the cluster's internal network.
+* *Ceiling allowlisting:* the one external endpoint the ceiling names is
+  the approved model gateway (`build.nvidia.com`). If the endpoint is not
+  on the ceiling's guest list, the connection is refused before HTTP.
+
+The signed ceiling is what the sandbox runtime enforces — so the "guest
+list" is not an agent's promise, it is governance-enforced fact. Every
+claim in this module is verified from outside the agent by paired probes
+and audit evidence, never taken from the agent's own output.
 
 == The fleet design
 
@@ -88,6 +99,12 @@ The backends sit behind a plain-HTTP telemetry proxy (the sandbox egress
 proxy inspects HTTP; TLS-only upstreams route through it). The fleet
 design originates in the `nemoclaw-openshift-launchable` sample (Scout,
 Gauge, Trace, Probe, Sage), scaled to three agents for this environment.
+
+On this release the interceptor enforces the shared ceiling on every fleet
+sandbox — the guest lists above are the *reviewed intent*, shipped as
+policy manifests in git, and the paired probes below prove what the
+runtime actually enforces. The good news is on the wall side: no fleet
+sandbox can reach any in-cluster service, whichever specialist it is.
 
 == Extension prerequisites
 
@@ -156,13 +173,20 @@ the governance interceptor signs each policy at create time — it only signs
 network access it governs, so a policy naming an undeclared backend fails
 closed.
 
+NOTE: On this release (0.1.2-rhaiv.0) the per-sandbox `--policy` narrowing
+is accepted at create but not reflected in enforcement — every fleet
+sandbox is enforced against the same interceptor-signed ceiling (a
+documented known limitation). The manifests above remain the reviewed
+intent, and Exercise 1 shows you how to read the effective policy either
+way.
+
 From your workstation, with the gateway selected and logged in (module 4):
 
 [source,bash,role="execute",subs="attributes+"]
 ----
 for agent in metrics traces analyst; do
   openshell --gateway {saw_gateway_name} sandbox create --name "$agent" \
-    --from quay.io/rh-ai-quickstart/openclaw-openshell:latest \
+    --from quay.io/rh-ai-quickstart/openclaw-openshell@sha256:69b2701ec9bb61194d901e51554c205d0ea7f09c04301e41923c468f082bb6c8 \
     --policy "{automation_repo}/policies/sandbox-policy-fleet-$agent.yaml" \
     --no-tty --detach -- sh -c 'sleep 86400'
 done
@@ -181,24 +205,36 @@ commands below omit `--workspace`. If you create them in `{saw_workspace}`,
 add `--workspace {saw_workspace}` to each command and set
 `WORKSPACE={saw_workspace}` for the GUI tunnel in Exercise 3.
 
-Resolve the MLflow experiment id once and keep it in your VM shell — every
-MLflow request needs it:
+The telemetry reads in Exercise 3 run from the operator side — your VM,
+through a port-forward — because the East-West wall denies in-cluster
+egress from fleet sandboxes (that denial is the good story, and Exercise 2
+proves it). Start the port-forward once and keep it running; every MLflow
+request needs it:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-export MLFLOW_EXPERIMENT_ID=$(openshell --gateway {saw_gateway_name} sandbox exec -n traces -- \
-  sh -c 'curl -s --max-time 15 \
-    -H "Authorization: Bearer $(cat /tmp/mlflow.token)" \
-    -H "X-MLFLOW-WORKSPACE: openshell" \
-    "http://telemetry-proxy.openshell-agents.svc.cluster.local:8081/mlflow/api/2.0/mlflow/experiments/get-by-name?experiment_name=sre-copilot-fleet"' \
+oc -n openshell-agents port-forward svc/telemetry-proxy 8081:8081 >/dev/null 2>&1 &
+----
+
+Pull the sandbox hand-off files the plant-incident-traces.sh job staged
+(the `traces` sandbox holds them) into your VM shell, and resolve the
+MLflow experiment id once — every MLflow request needs it:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+openshell --gateway {saw_gateway_name} sandbox exec -n traces -- cat /tmp/mlflow.token > /tmp/mlflow.token
+export MLFLOW_EXPERIMENT_ID=$(curl -s --max-time 15 \
+  -H "Authorization: Bearer $(cat /tmp/mlflow.token)" \
+  -H "X-MLFLOW-WORKSPACE: openshell" \
+  "http://127.0.0.1:8081/mlflow/api/2.0/mlflow/experiments/get-by-name?experiment_name=sre-copilot-fleet" \
   | jq -r .experiment.experiment_id)
 echo "experiment id: $MLFLOW_EXPERIMENT_ID"
 ----
 
 == Exercise 1: Verify the fleet and its guest lists
 
-All three sandboxes are Ready, and each one carries a *different*
-governance-signed policy:
+All three sandboxes are Ready, and each one carries the *interceptor-signed
+ceiling policy* — the same signed baseline lands on every fleet sandbox:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
@@ -208,50 +244,75 @@ openshell --gateway {saw_gateway_name} policy get analyst --full
 openshell --gateway {saw_gateway_name} policy get traces --full
 ----
 
-Pass condition: the `metrics` policy names only the Prometheus proxy
-endpoint, the `traces` policy names only the MLflow proxy endpoint, and
-the `analyst` policy names no telemetry endpoint at all. Each policy
-carries the governance signature — this is a signed contract, not an
-agent's word.
+Pass condition: three sandboxes report Ready, and each `policy get --full`
+returns the governance-signed ceiling — same signature on all three, the
+interceptor's contract with every sandbox it vends. The per-agent guest
+lists in the git manifests are the reviewed intent; on this release
+enforcement reflects the common ceiling (see the note in "Provision the
+fleet"). What matters for security — and what Exercise 2 proves — is that
+the ceiling itself is signed, enforced, and deny-by-default.
 
 == Exercise 2: Prove the walls with paired probes
 
-Attempt the same request from differently-scoped sandboxes. The paired
-requests isolate a policy denial from an unrelated endpoint failure:
+This is the money exercise: two paired probes, one from inside a fleet
+sandbox and one control from outside, that show the East-West wall holding.
+The sandbox image ships Node (`/usr/bin/node`), so the probes use Node's
+`fetch` — and a denial arrives as `EACCES` before any HTTP status.
+
+*Probe 1 — the declared in-cluster backend, from the sandbox (East-West
+test).* The `metrics` sandbox names the telemetry proxy as its backend, and
+the wall refuses it anyway — in-cluster service addresses are not on the
+ceiling's guest list:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-if openshell --gateway {saw_gateway_name} sandbox exec -n metrics -- \
-  curl -s -o /dev/null -w 'HTTP \{http_code}\n' --max-time 15 \
-  "http://telemetry-proxy.openshell-agents.svc.cluster.local:8080/api/v1/query?query=up"; then
-  echo 'EXPECTED: the metrics sandbox reached its declared backend'
-else
-  echo 'ERROR: the declared backend was unreachable'
-  false
-fi
-
-if openshell --gateway {saw_gateway_name} sandbox exec -n metrics -- \
-  curl -s -o /dev/null -w 'HTTP \{http_code}\n' --max-time 15 \
-  "http://telemetry-proxy.openshell-agents.svc.cluster.local:8081/"; then
-  echo 'ERROR: metrics reached an undeclared backend'
-  false
-else
-  echo 'Request denied before HTTP; check the denial in the audit stream'
-fi
+openshell --gateway {saw_gateway_name} sandbox exec -n metrics -- \
+  /usr/bin/node -e 'fetch("http://telemetry-proxy.openshell-agents.svc.cluster.local:8080/api/v1/query?query=up").then(r=>console.log("HTTP",r.status)).catch(e=>console.log("DENIED:",(e.cause&&e.cause.code)||e.message))'
 ----
 
-Repeat the pair from the `analyst` sandbox (both requests denied) and from
-`traces` (MLflow allowed, Prometheus denied). Any HTTP status — including
-401 without a bearer token — proves the policy allowed the connection;
-a denial fails before HTTP because the host is absent from that sandbox's
-policy.
+*Control — the same endpoint from your VM.* The service is up and
+reachable from the operator side; only the sandbox is walled off:
 
-== Exercise 3: Read live telemetry through the scoped agent
+[source,bash,role="execute",subs="attributes+"]
+----
+oc -n openshell-agents port-forward svc/telemetry-proxy 18080:8080 >/dev/null 2>&1 &
+curl -s -o /dev/null -w 'HTTP %{http_code}\n' --max-time 15 \
+  "http://127.0.0.1:18080/api/v1/query?query=up"
+----
 
-The `metrics` agent's backend answers 401 without a bearer token — the
-authentication requirement is itself evidence that the path works. With
-the facilitator-vended read-only service account token, the agent queries
-real cluster metrics.
+*Probe 2 — the ceiling's allowlisted model endpoint, from the sandbox.*
+The one external host the ceiling names is the approved model gateway, and
+it is reachable — proving the denial above is policy, not a broken network:
+
+[source,bash,role="execute",subs="attributes+"]
+----
+openshell --gateway {saw_gateway_name} sandbox exec -n metrics -- \
+  /usr/bin/node -e 'fetch("https://build.nvidia.com").then(r=>console.log("HTTP",r.status)).catch(e=>console.log("DENIED:",(e.cause&&e.cause.code)||e.message))'
+----
+
+Pass condition: the in-cluster probe from the sandbox fails with `EACCES`
+(denied before any HTTP), the VM control returns an HTTP status — 401
+without a bearer token is fine, it proves the path works — and the
+allowlisted `build.nvidia.com` probe returns HTTP 200 from the sandbox.
+That trio *is* the security story, demonstrated live: an agent sandbox
+cannot wander the cluster's internal network, while the one approved
+external endpoint works.
+
+Repeat probe 1 from the `analyst` and `traces` sandboxes: identical
+`EACCES`. The ceiling is signed onto every fleet sandbox — the wall does
+not depend on which specialist the agent is, and it cannot be widened by
+the agent.
+
+== Exercise 3: Read live telemetry through the operator plane
+
+The wall you proved in Exercise 2 is the good news: fleet sandboxes cannot
+reach in-cluster services, the telemetry proxy included. So the telemetry
+evidence is read from the *operator side* — your VM, through the
+port-forward you started — while the agent plane stays fully isolated.
+The proxy answers 401 without a bearer token — the authentication
+requirement is itself evidence that the path works. With the
+facilitator-vended read-only service account token, you query real
+cluster metrics.
 
 Open the agent surfaces alongside your evidence queries. The fleet sandboxes
 live on `{saw_gateway_name}`, so both agent surfaces from earlier modules
@@ -268,7 +329,8 @@ SANDBOX_NAME=metrics GATEWAY_NAME={saw_gateway_name} \
 ----
 
 Open the printed URL and chat with the `metrics` agent while watching tool
-activity live.
+activity live. Asking the agent to reach telemetry and watching the wall
+refuse it is a live isolation demo, not a failure.
 
 * *OpenShell TUI (operator view)* — in a second terminal, as in Module 2:
 
@@ -280,35 +342,34 @@ openshell term --gateway {saw_gateway_name}
 Keep the evidence queries below in the first terminal: user-level interaction
 and operator management side by side.
 
-Ask the agent (through the Control UI or the TUI) to
-check the health of the `demo` namespace, or query directly:
+Pull the read-only service account token out of the `metrics` sandbox and
+query the live cluster metrics from your VM — the operator side of the
+wall:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-openshell --gateway {saw_gateway_name} sandbox exec -n metrics -- \
-  sh -c 'curl -s --max-time 15 -H "Authorization: Bearer $(cat /tmp/sa.token)" \
-    "http://telemetry-proxy.openshell-agents.svc.cluster.local:8080/api/v1/query?query=kube_deployment_status_replicas_available%7Bnamespace%3D%22demo%22%7D"'
+oc -n openshell-agents port-forward svc/telemetry-proxy 18080:8080 >/dev/null 2>&1 &
+openshell --gateway {saw_gateway_name} sandbox exec -n metrics -- cat /tmp/sa.token > /tmp/sa.token
+curl -s --max-time 15 -H "Authorization: Bearer $(cat /tmp/sa.token)" \
+  "http://127.0.0.1:18080/api/v1/query?query=kube_deployment_status_replicas_available%7Bnamespace%3D%22demo%22%7D"
 ----
 
-The `traces` agent reads AI agent execution traces from MLflow. The
+The `traces` story reads AI agent execution traces from MLflow. The
 facilitator planted the agent-session traces of the prior incident — the
 record of what the fleet *actually did* the last time this incident ran.
-Start by asking the agent in plain language; searching by incident, not by
-trace ID, is the natural read pattern:
-
-    "traces, show me what the fleet did during incident INC-4127"
-
-Run the identical search directly to see exactly what the agent sees:
+Search by incident, not by trace ID, is the natural read pattern. Pull the
+staged search payload out of the `traces` sandbox and run the identical
+search the agent story uses:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-openshell --gateway {saw_gateway_name} sandbox exec -n traces -- \
-  sh -c 'curl -s --max-time 15 -X POST \
-    -H "Authorization: Bearer $(cat /tmp/mlflow.token)" \
-    -H "X-MLFLOW-WORKSPACE: openshell" \
-    -H "Content-Type: application/json" \
-    --data-binary @/tmp/incident-search.json \
-    "http://telemetry-proxy.openshell-agents.svc.cluster.local:8081/mlflow/api/3.0/mlflow/traces/search"'
+openshell --gateway {saw_gateway_name} sandbox exec -n traces -- cat /tmp/incident-search.json > /tmp/incident-search.json
+curl -s --max-time 15 -X POST \
+  -H "Authorization: Bearer $(cat /tmp/mlflow.token)" \
+  -H "X-MLFLOW-WORKSPACE: openshell" \
+  -H "Content-Type: application/json" \
+  --data-binary @/tmp/incident-search.json \
+  "http://127.0.0.1:8081/mlflow/api/3.0/mlflow/traces/search"
 ----
 
 Pass condition: the search returns the planted incident session, ordered
@@ -325,47 +386,46 @@ prefix on their trace ID:
 ----
 # TRACE_ID: copy one from the search result above
 TRACE_ID=tr-26e481fb6b1c17d11918ba6b3d1445ad
-openshell --gateway {saw_gateway_name} sandbox exec -n traces -- \
-  sh -c 'curl -s --max-time 15 \
-    -H "Authorization: Bearer $(cat /tmp/mlflow.token)" \
-    -H "X-MLFLOW-WORKSPACE: openshell" \
-    "http://telemetry-proxy.openshell-agents.svc.cluster.local:8081/mlflow/api/3.0/mlflow/traces/'"$TRACE_ID"'?experiment_id='"$MLFLOW_EXPERIMENT_ID"'"'
+curl -s --max-time 15 \
+  -H "Authorization: Bearer $(cat /tmp/mlflow.token)" \
+  -H "X-MLFLOW-WORKSPACE: openshell" \
+  "http://127.0.0.1:8081/mlflow/api/3.0/mlflow/traces/$TRACE_ID?experiment_id=$MLFLOW_EXPERIMENT_ID"
 ----
 
 This is *agents auditing agents*: the trace store is a record of agent
-behavior — which tools ran, what was sent, who approved what — that a
-governed agent can be interrogated against. The workspace header is
+behavior — which tools ran, what was sent, who approved what — that the
+governed agent story can be interrogated against. The workspace header is
 mandatory on every MLflow request: without it the proxy rejects the call
 outright.
 
 Finally, watch a trace arrive live. The staged sample is a complete agent
-session; ingest it through the OpenTelemetry endpoint — the write path the
-fleet uses — and note that the acknowledgement is empty: OTLP carries no
-response body, which is exactly why search, not IDs, is how you find what
-you just wrote. Then re-run the incident search above and see your own
-session appear in the results:
+session; pull it out of the `traces` sandbox and ingest it through the
+OpenTelemetry endpoint — the write path the fleet story uses — noting that
+the acknowledgement is empty: OTLP carries no response body, which is
+exactly why search, not IDs, is how you find what you just wrote. Then
+re-run the incident search above and see your own session appear in the
+results:
 
 [source,bash,role="execute",subs="attributes+"]
 ----
-# Ingest your own session trace (the write path the fleet uses live):
-openshell --gateway {saw_gateway_name} sandbox exec -n traces -- \
-  sh -c 'curl -s --max-time 15 -X POST \
-    -H "x-mlflow-experiment-id: '"$MLFLOW_EXPERIMENT_ID"'" \
-    -H "X-MLFLOW-WORKSPACE: openshell" \
-    -H "Authorization: Bearer $(cat /tmp/mlflow.token)" \
-    -H "Content-Type: application/json" \
-    --data-binary @/tmp/agent-session-trace.json \
-    "http://telemetry-proxy.openshell-agents.svc.cluster.local:8081/v1/traces"'
+# Ingest your own session trace (the write path the fleet story uses live):
+openshell --gateway {saw_gateway_name} sandbox exec -n traces -- cat /tmp/agent-session-trace.json > /tmp/agent-session-trace.json
+curl -s --max-time 15 -X POST \
+  -H "x-mlflow-experiment-id: $MLFLOW_EXPERIMENT_ID" \
+  -H "X-MLFLOW-WORKSPACE: openshell" \
+  -H "Authorization: Bearer $(cat /tmp/mlflow.token)" \
+  -H "Content-Type: application/json" \
+  --data-binary @/tmp/agent-session-trace.json \
+  "http://127.0.0.1:8081/v1/traces"
 
 # Re-run the incident search — your session (session.demo: participant)
 # now appears in the results alongside the planted fleet traces.
-openshell --gateway {saw_gateway_name} sandbox exec -n traces -- \
-  sh -c 'curl -s --max-time 15 -X POST \
-    -H "Authorization: Bearer $(cat /tmp/mlflow.token)" \
-    -H "X-MLFLOW-WORKSPACE: openshell" \
-    -H "Content-Type: application/json" \
-    --data-binary @/tmp/incident-search.json \
-    "http://telemetry-proxy.openshell-agents.svc.cluster.local:8081/mlflow/api/3.0/mlflow/traces/search"'
+curl -s --max-time 15 -X POST \
+  -H "Authorization: Bearer $(cat /tmp/mlflow.token)" \
+  -H "X-MLFLOW-WORKSPACE: openshell" \
+  -H "Content-Type: application/json" \
+  --data-binary @/tmp/incident-search.json \
+  "http://127.0.0.1:8081/mlflow/api/3.0/mlflow/traces/search"
 ----
 
 GUI view: the MLflow instance also serves a tracking UI. Check whether the
@@ -399,44 +459,52 @@ oc -n {saw_namespace} get route incident-console
   ready replicas.
 . *Inject the outage* — scale the shop to zero from the console. Human
   action, not the agent's.
-. Run the fleet investigation: the `metrics` agent queries live cluster
-  metrics and finds the available-replica collapse; the `traces` agent
-  audits what the fleet did last time by searching the planted `INC-4127`
-  session; the `analyst` combines the findings. Note what the analyst
-  *cannot* do — it has no way to verify anything itself, by design.
+. Run the fleet investigation: the `metrics` story finds the
+  available-replica collapse with the Exercise 3 query (re-run it from the
+  VM — the East-West wall keeps the sandboxes off the internal network, so
+  the operator plane feeds the specialists their evidence); the `traces`
+  story audits what the fleet did last time by searching the planted
+  `INC-4127` session; the `analyst` combines the findings. Note what the
+  analyst *cannot* do — it has no way to verify anything itself, by design.
 . *Confirm the remediation* — restore the shop from the console after
   reviewing the recommendation.
 . Verify recovery: the shop returns to two ready replicas.
 
-The agents recommend; they never receive Kubernetes write access. The
-console's confirmation button is *not* durable, identity-bound approval
-evidence — a production workflow needs an authenticated approval record
-and a controlled delivery path such as a reviewed Git change reconciled by
-Argo CD.
+The agents recommend; they never receive Kubernetes write access — and the
+Exercise 2 probes prove they never receive in-cluster network access
+either. The console's confirmation button is *not* durable, identity-bound
+approval evidence — a production workflow needs an authenticated approval
+record and a controlled delivery path such as a reviewed Git change
+reconciled by Argo CD.
 
 == Evidence checkpoint
 
 Collect:
 
-* the three governance-signed policies with three different guest lists;
-* paired allow/deny decisions for every agent;
-* the live metrics query returning real cluster data through the scoped
-  agent;
+* the interceptor-signed ceiling policy, same signature on all three fleet
+  sandboxes, visible with `policy get --full`;
+* the paired probes: in-cluster `EACCES` from every fleet sandbox, the VM
+  control's HTTP status, and `build.nvidia.com` HTTP 200 from the sandbox;
+* the live metrics query returning real cluster data through the operator
+  plane;
 * the incident-tag search returning the planted agent-session story from
-  the `traces` agent, plus the participant's own ingested session trace;
+  the `traces` story, plus the participant's own ingested session trace;
 * the outage state transition: healthy baseline, collapsed replicas,
   human-confirmed remediation, and recovery.
 
 .Answer key
 [%collapsible]
 ====
-* Per-agent network destination: the per-sandbox governance-signed policy,
-  visible with `policy get --full`. The interceptor signed each one.
-* The paired probes prove the walls from outside the agent: allowed
-  requests complete with an HTTP status (401 included), denied requests
-  fail before HTTP.
-* The analyst's zero egress means its conclusions cannot be self-verified
-  — synthesis without exfiltration risk, by construction.
+* Network destinations: the interceptor-signed ceiling policy, visible with
+  `policy get --full` — the same signed baseline on every fleet sandbox.
+* The paired probes prove the walls from outside the agent: the in-cluster
+  probe fails with `EACCES` before HTTP, the VM control completes with an
+  HTTP status (401 included), and the allowlisted `build.nvidia.com`
+  returns HTTP 200 from the sandbox.
+* The ceiling denies every in-cluster service on this release — per-sandbox
+  `--policy` narrowing is accepted at create but not reflected in
+  enforcement (a documented 0.1.2 known limitation); the ceiling itself is
+  the enforced contract.
 * Trace read patterns: search by incident and role tags is the natural
   read (the planted `INC-4127` session, ordered by time); the trace ID is
   only for drilling into one finding. OTLP-ingested traces carry a `tr-`
