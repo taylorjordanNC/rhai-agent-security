@@ -6,3 +6,4 @@ automation/fleet/clusters.csv
 automation/fleet/clusters.status
 automation/fleet/install-*.log
 automation/fleet/.workers/
+publishing-house/
