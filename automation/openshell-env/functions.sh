@@ -192,6 +192,67 @@ deploy_http_echo() {
     info "http-echo available at http://http-echo.${ns}.svc.cluster.local:8080"
 }
 
+# The workshop's sandbox base image, digest-pinned to the multi-arch index
+# digest of ghcr.io/nvidia/openshell-community/sandboxes/base:latest
+# (verified via `skopeo inspect --raw`; the digest fetches successfully).
+# The raw-track install mirrors this image into the cluster's internal
+# registry (see mirror_sandbox_image) so the FIRST sandbox create on a
+# freshly installed gateway never races the supervisor's provisioning
+# window against a cold ~3.4 GB external pull.
+SANDBOX_BASE_GHCR="ghcr.io/nvidia/openshell-community/sandboxes/base@sha256:aeef1c63f00e2913ea002ccb3aaf925f338b5c5d70e63576f0d95c16a138044e"
+
+mirror_sandbox_image() {
+    # Mirror the sandbox base image into the internal registry so first-create
+    # provisioning pulls land in-cluster instead of racing the supervisor's
+    # window against ghcr.io. Sets MIRRORED_SANDBOX_IMAGE on success; the
+    # caller keeps the digest-pinned ghcr ref as the fallback otherwise.
+    MIRRORED_SANDBOX_IMAGE=""
+    local ns="$1"
+    command -v skopeo &>/dev/null || {
+        warn "skopeo not found; skipping sandbox base mirror (first sandbox create pulls from ghcr.io)"
+        return 0
+    }
+    local reg_host
+    reg_host=$(oc -n openshift-image-registry get route default-route \
+        -o jsonpath='{.spec.host}' 2>/dev/null || true)
+    if [ -z "$reg_host" ]; then
+        # Fresh clusters don't expose the registry's default route; enable it
+        # so the host-side skopeo copy can reach the internal registry.
+        step "Enabling the internal registry default route (skopeo push path)"
+        if oc patch configs.imageregistry.operator.openshift.io/cluster \
+            --type merge -p '{"spec":{"defaultRoute":true}}' 2>/dev/null; then
+            oc -n openshift-image-registry wait --for=jsonpath='{.spec.host}' route/default-route \
+                --timeout=60s 2>/dev/null || true
+            reg_host=$(oc -n openshift-image-registry get route default-route \
+                -o jsonpath='{.spec.host}' 2>/dev/null || true)
+        fi
+        if [ -z "$reg_host" ]; then
+            warn "internal registry default route not available; skipping sandbox base mirror"
+            return 0
+        fi
+    fi
+    # Internal-registry repo names are single-level (<project>/<name>) — the
+    # ghcr path's `sandboxes/base` would be rejected by the registry, so the
+    # mirror lands as `sandboxes-base`. Push by TAG: digest-only pushes do not
+    # populate the ImageStream (registry 500s on digest pulls of a tagless IS),
+    # while a tagged push registers the digest so digest-pinned pulls resolve.
+    step "Mirror sandbox base image to internal registry (${reg_host}/${ns}/sandboxes-base)"
+    if skopeo copy --all \
+        --src-tls-verify=true --dest-tls-verify=false \
+        --dest-creds="openshift:$(oc whoami -t)" \
+        "docker://${SANDBOX_BASE_GHCR}" \
+        "docker://${reg_host}/${ns}/sandboxes-base:base"; then
+        # The sandbox runtime resolves bare refs (<ns>/<repo>@<digest>) against
+        # docker.io, NOT the internal registry (live-verified: ErrImagePull →
+        # docker.io/openshell/sandboxes-base). Only the full internal endpoint
+        # resolves in-cluster (live-verified: 3.2 GB pulled in ~17 s):
+        MIRRORED_SANDBOX_IMAGE="image-registry.openshift-image-registry.svc:5000/${ns}/sandboxes-base@${SANDBOX_BASE_GHCR#*@}"
+        info "Sandbox base image mirrored: ${MIRRORED_SANDBOX_IMAGE}"
+    else
+        warn "sandbox base mirror failed; keeping digest-pinned ghcr.io fallback"
+    fi
+}
+
 install_cert_manager() {
     if oc get crd certificates.cert-manager.io &>/dev/null; then
         info "cert-manager CRDs already available"
@@ -388,7 +449,13 @@ health_bind_address   = "0.0.0.0:8081"
 metrics_bind_address  = "0.0.0.0:9090"
 log_level             = "info"
 sandbox_namespace     = "${ns}"
-default_image         = "ghcr.io/nvidia/openshell-community/sandboxes/base:latest"
+# NOTE: this points at the internal-registry mirror the raw-track install
+# creates (mirror_sandbox_image). BARE refs (<ns>/<repo>@<digest>) resolve
+# against docker.io in the sandbox runtime (live-verified: ErrImagePull), so
+# only the full internal endpoint form works. If the mirror was skipped (no
+# skopeo or no registry route), swap back to the digest-pinned ghcr.io ref:
+#   ghcr.io/nvidia/openshell-community/sandboxes/base@sha256:aeef1c63f00e2913ea002ccb3aaf925f338b5c5d70e63576f0d95c16a138044e
+default_image         = "image-registry.openshift-image-registry.svc:5000/${ns}/sandboxes-base@sha256:aeef1c63f00e2913ea002ccb3aaf925f338b5c5d70e63576f0d95c16a138044e"
 disable_tls           = false
 enable_loopback_service_http = true
 client_tls_secret_name = "openshell-client-ca"

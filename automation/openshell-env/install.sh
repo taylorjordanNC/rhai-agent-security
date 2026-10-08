@@ -12,7 +12,12 @@ RAW_GATEWAY_NAME="${RAW_GATEWAY_NAME:-local-gateway}"
 # OpenShell Helm chart version. The chart pins the gateway image by digest
 # below, so the gateway build matches the workshop's 0.1.2-rhaiv.0 CLI.
 OPENSHELL_VERSION="${OPENSHELL_VERSION:-0.1.2}"
-OPENSHELL_SANDBOX_IMAGE="${OPENSHELL_SANDBOX_IMAGE:-ghcr.io/nvidia/openshell-community/sandboxes/base@sha256:aeef1c63f00e2913ea002ccb3aaf925f338b5c5d70e63576f0d95c16a138044e}"
+# Sandbox base image, digest-pinned to the multi-arch index digest (no
+# mutable :latest). The mirror step below prepulls it into the internal
+# registry so the first sandbox create on a fresh order doesn't race the
+# supervisor's 300 s provisioning window against a cold ~3.4 GB pull; the
+# digest-pinned ghcr.io ref remains the fallback when mirroring is skipped.
+OPENSHELL_SANDBOX_IMAGE="${OPENSHELL_SANDBOX_IMAGE:-${SANDBOX_BASE_GHCR}}"
 # RHAIV gateway image (0.1.2-rhaiv.0), digest-pinned like the SAW track.
 OPENSHELL_GATEWAY_REPO="${OPENSHELL_GATEWAY_REPO:-quay.io/opendatahub/odh-openshell-gateway}"
 OPENSHELL_GATEWAY_DIGEST="${OPENSHELL_GATEWAY_DIGEST:-sha256:c3b230a32245d0a6c35ed11c17cf590da9ede79dfb0378e3829e16709f63fba3}"
@@ -51,6 +56,16 @@ install_agent_sandbox_operator
 
 # Step 2: Namespace
 create_openshell_namespace "$NAMESPACE"
+
+# Step 2b: Mirror the sandbox base image into the internal registry so the
+# first sandbox create on a fresh order never hits ProvisioningDeadlineElapsed
+# against a cold ghcr.io pull. Skipped (with a warning) when skopeo is absent
+# or the registry route can't be enabled — swap back to the digest-pinned
+# ghcr.io ref above as the fallback.
+mirror_sandbox_image "$NAMESPACE"
+if [ -n "${MIRRORED_SANDBOX_IMAGE:-}" ]; then
+    OPENSHELL_SANDBOX_IMAGE="$MIRRORED_SANDBOX_IMAGE"
+fi
 
 # Step 3: SCC
 grant_privileged_scc "$NAMESPACE"
