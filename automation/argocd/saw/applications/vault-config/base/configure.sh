@@ -129,4 +129,27 @@ vault write auth/hub/role/hub-role \
   policies=hub \
   ttl=1h
 
+# Re-create the portal's policy and role on every run. The hub auth mount is
+# disabled and re-enabled above, which wipes ALL roles on the mount - including
+# the self-service portal's saw-portal-writer role that the RHDH portal
+# pipeline needs to write users' keys. Clusters running the validated-patterns
+# imperative framework re-create it via the saw-portal-vault CronJob, but
+# without this block a manually-created role never survives the 10-minute TTL.
+echo "Writing policy 'saw-portal-writer'"
+vault policy write saw-portal-writer - <<'EOF'
+path "secret/data/hub/saw-*" {
+  capabilities = ["create", "update", "read"]
+}
+path "secret/metadata/hub/saw-*" {
+  capabilities = ["read", "list", "delete"]
+}
+EOF
+
+echo "Writing role 'saw-portal-writer' bound to system:serviceaccount:saw-portal:saw-portal-provisioner"
+vault write auth/hub/role/saw-portal-writer \
+  bound_service_account_names="saw-portal-provisioner" \
+  bound_service_account_namespaces="saw-portal" \
+  policies="saw-portal-writer" \
+  ttl=15m
+
 echo "Vault configuration complete"
